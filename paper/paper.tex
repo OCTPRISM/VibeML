@@ -1,0 +1,573 @@
+\documentclass[10pt,twocolumn]{article}
+
+% ── NOTE FOR SUBMISSION ──────────────────────────────────────────────────────
+% This file uses a generic two-column article layout, NOT the official ICML
+% \usepackage{icml20XX} style file (we did not have verified network access to
+% fetch it and chose not to guess a URL for it). Before actual ICML submission,
+% replace the geometry/font setup below with \usepackage{icml20XX} and the
+% \begin{icmlauthorlist}...\end{icmlauthorlist} author-block macros it provides;
+% the content, structure, and section ordering below already follow ICML
+% conventions (Abstract, numbered sections, Impact Statement optional,
+% References) and should not need to change.
+\usepackage[margin=1in,columnsep=0.25in]{geometry}
+\usepackage{times}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{caption}
+
+\title{\vspace{-1em}A Sandboxed, Conversational, Multi-Backend System for\\
+Low-Resource Text Classification and LLM-Synthesized\\
+Reinforcement-Learning Environments\vspace{-0.5em}}
+
+\author{}
+\date{}
+
+\begin{document}
+\twocolumn[
+\maketitle
+\begin{center}
+\begin{minipage}{0.92\textwidth}
+\centering
+\small\textit{Anonymous submission. All experimental numbers reported in this paper
+were produced by the accompanying codebase and are reproducible via the scripts in
+\texttt{eval/}; raw outputs are stored under \texttt{outputs/}.}
+\end{minipage}
+\end{center}
+\vspace{1em}
+]
+
+\begin{abstract}
+We describe a working system that lets a user specify, train, and deploy machine
+learning models entirely through natural-language dialogue, across two paradigms:
+low-resource text classification (10--200 labeled examples per class) and
+reinforcement learning (RL) with environments synthesized on the fly by a large
+language model (LLM) from a natural-language task description. The system's
+central engineering contribution is a safety pattern for executing
+LLM-generated, Turing-complete code (PyTorch classification heads and
+Gymnasium-style RL environments) without full sandboxing guarantees: static
+AST allow-listing, a second layer of restricted-builtin code execution, and a
+wall-clock-bounded subprocess as the final backstop, composed with a
+three-tier fallback ladder (LLM-generated classifier
+$\to$ fine-tuned pretrained backbone $\to$ classical sklearn baseline) that
+degrades gracefully when LLM code generation fails. We report four real,
+reproducible experiments rather than claims: (1) the system's
+zero-configuration sklearn backend is statistically indistinguishable from
+hand-tuned classical baselines on four real datasets (Wilcoxon signed-rank,
+all $p>0.05$); (2) a red-team suite of 45 malicious and benign code samples
+against the static sandbox layer; (3) an empirical characterization of how
+often LLM-generated classifier code succeeds before the fallback ladder
+degrades it; and (4) a study of whether LLM-synthesized RL environments,
+validated only by static analysis, actually train to non-trivial reward
+improvement across a diverse set of natural-language task descriptions --
+where a static sandbox pass rate of 81\% drops to a 31\% end-to-end
+completion rate, and direct diagnosis traces most of that gap to a single,
+specific, actionable cause: generated environments routing stochastic
+transitions through unseeded randomness instead of Gymnasium's own seeded
+RNG, which its \texttt{check\_env} correctness checker (not our sandbox)
+correctly rejects. We report failures as well as successes, and we are
+explicit about what this evaluation does and does not establish.
+\end{abstract}
+
+\section{Introduction}
+
+Making machine learning accessible to non-experts is a long-standing goal of
+the AutoML literature. Existing systems (Section~\ref{sec:related}) largely
+automate a fixed, hand-engineered search space over models and
+hyperparameters. A separate line of recent work uses large language models
+as agents that write and execute code to accomplish tasks, raising a
+distinct engineering problem: if the system lets an LLM generate the actual
+training code (not just configuration), how much of that code can be
+executed safely, and what happens when the generated code is wrong or
+unsafe?
+
+This paper describes a system built to explore that question concretely,
+across two settings: (a) low-resource text classification, where the system
+can optionally let an LLM design a custom PyTorch classification head, and
+(b) reinforcement learning, where the LLM must synthesize the entire training
+environment (state, action space, reward function, and termination
+condition) from a natural-language description, since no other component of
+the pipeline can supply this.
+
+\textbf{We want to be precise about what this paper claims.} This is a
+systems paper, not a new learning algorithm. We do not claim state-of-the-art
+results on standard large-scale benchmarks, and we did not run a human-subject
+study to validate whether natural-language clarification dialogue is an
+effective substitute for an ML expert configuring the system by hand --
+that would require an IRB-approved user study, which is out of scope here and
+is listed explicitly in Section~\ref{sec:limitations}. Our contribution is
+threefold:
+\begin{enumerate}
+  \item A concrete, reusable engineering pattern for executing LLM-generated
+        training code (classification heads and RL environments) with three
+        independent, layered defenses, empirically red-teamed rather than
+        asserted safe.
+  \item A three-tier fallback ladder (custom LLM-generated model
+        $\to$ fine-tuned pretrained backbone $\to$ classical baseline) and
+        an empirical characterization of how often the riskiest, most novel
+        tier actually succeeds before falling back.
+  \item An empirical study of whether natural-language-specified,
+        LLM-synthesized RL environments actually produce learnable tasks,
+        across a deliberately diverse set of task descriptions that avoid
+        naming well-known benchmark environments (to reduce the chance the
+        LLM is simply reproducing memorized reference code).
+\end{enumerate}
+
+\section{Related Work}
+\label{sec:related}
+
+\textbf{AutoML.} Systems such as AutoGluon, auto-sklearn, and AutoML-Zero
+automate model/hyperparameter search over a fixed space of established
+methods. Our system automates the same kind of decision (which model family,
+which hyperparameters) but adds a qualitatively different option -- letting
+an LLM design new model code at request time -- which these systems do not
+attempt, precisely because it reintroduces the code-safety problem that a
+fixed search space avoids by construction.
+
+\textbf{Conversational / interactive ML systems.} Prior work on interactive
+model building typically focuses on visual or notebook-based interfaces
+rather than open-ended natural-language dialogue driving every stage
+(clarification, data collection, backend selection, training, and reporting)
+of the pipeline.
+
+\textbf{LLM code-generation agents and sandboxing.} A growing literature
+studies how to safely execute code written by an LLM agent, typically via
+containerization, syscall filtering, or restricted interpreters. Our
+approach is narrower and more specific to this domain: rather than a general
+sandboxed interpreter, we combine (a) a static AST allow-list scoped tightly
+to the exact contract the generated code must satisfy (e.g., a class
+implementing \texttt{\_\_init\_\_}/\texttt{forward} for a classifier, or
+\texttt{reset}/\texttt{step} for an RL environment), (b) a restricted-builtin
+\texttt{exec()} environment as a second, independent layer, and (c) a
+wall-clock-bounded subprocess as the final backstop against anything the
+first two layers miss (notably, resource-exhaustion attacks that have no
+fixed syntactic signature -- see Section~\ref{sec:exp3}).
+
+\textbf{Natural-language-driven RL environment / reward synthesis.} Recent
+work (e.g., LLM-driven reward-function design and skill/curriculum
+synthesis in embodied agents) shows LLMs can propose reward functions or
+high-level skills for RL. Our RL setting differs in scope: the LLM must
+synthesize the \emph{entire} environment dynamics (state transition and
+termination logic), not only a reward function layered on top of an
+existing, trusted environment, which is a strictly larger and less
+constrained code-generation surface.
+
+\section{System Design}
+
+\subsection{Conversational orchestration}
+The system exposes a WebSocket-backed multi-turn dialogue. A finite-stage
+state machine (task clarification $\to$ data/environment collection $\to$
+backend selection $\to$ training-configuration $\to$ training $\to$
+reporting) processes each user message; a stage advances as soon as it is
+satisfied, so a single message that already contains everything needed
+(e.g., a fully-specified task description with pasted examples) skips
+directly to training without being re-asked. Training progress is streamed
+into the same message channel as ordinary chat messages, so the frontend's
+visualization logic is agnostic to whether the underlying backend is a
+classical classifier, a fine-tuned transformer, or a reinforcement-learning
+policy.
+
+\subsection{Three-tier classification fallback ladder}
+For text classification, the system attempts, in order: (1) an
+LLM-generated, sandbox-validated custom PyTorch classification head over
+TF-IDF features; (2) if that fails validation or training twice, a
+LoRA-fine-tuned pretrained transformer backbone from a small fixed
+whitelist; (3) if that also fails, a classical TF-IDF~+~sklearn classifier
+(logistic regression / linear SVM / SGD, chosen automatically by dataset
+size), which is guaranteed to succeed and is never itself sandboxed since it
+runs no LLM-generated code.
+
+\subsection{RL environment synthesis}
+For reinforcement learning, the LLM is prompted to generate a
+\texttt{gymnasium.Env} subclass matching a fixed contract
+(\texttt{\_\_init\_\_} with no required arguments beyond \texttt{self};
+\texttt{reset(seed, options) -> (obs, info)}; \texttt{step(action) ->
+(obs, reward, terminated, truncated, info)}). The generated class is (a)
+statically validated (Section~\ref{sec:sandbox-design}), (b) instantiated in
+an isolated subprocess and wrapped unconditionally in a
+\texttt{TimeLimit} wrapper regardless of whether the generated code sets
+\texttt{terminated} correctly, (c) checked with Gymnasium's own
+\texttt{check\_env} utility as a free correctness pre-check, and only then
+(d) trained with Stable-Baselines3's PPO or DQN (chosen automatically by
+action-space type) -- i.e., the training \emph{algorithm} is always trusted
+library code; only the environment is LLM-generated, which deliberately
+minimizes the code-execution attack surface relative to also letting the
+LLM generate the policy network.
+
+\subsection{Sandbox design}
+\label{sec:sandbox-design}
+Both the classification-head and RL-environment code paths share the same
+three-layer defense-in-depth pattern:
+\begin{enumerate}
+  \item \textbf{Static AST gate.} Only a small, explicit set of import
+        modules is allowed (\texttt{torch}/\texttt{torch.nn}/\texttt{torch.nn.functional}
+        for classifiers; \texttt{gymnasium}/\texttt{gymnasium.spaces}/\texttt{numpy}/\texttt{math}/\texttt{random}
+        for RL environments -- \texttt{torch} is deliberately excluded from
+        the RL allow-list, since the training algorithm supplies the policy
+        network and the environment has no legitimate need for it). A
+        further denylist blocks known dangerous names (\texttt{os},
+        \texttt{subprocess}, \texttt{socket}, \texttt{eval}, \texttt{exec},
+        \texttt{open}, \texttt{\_\_import\_\_}, \ldots) and classic sandbox-escape
+        dunders (\texttt{\_\_globals\_\_}, \texttt{\_\_subclasses\_\_},
+        \texttt{\_\_reduce\_\_}, \ldots), and rejects any decorator use and
+        any structural deviation from the required class contract.
+  \item \textbf{Restricted \texttt{exec()} builtins.} Even code that passed
+        the static gate is executed with a minimal builtins dictionary
+        (roughly 25 names -- \texttt{range}, \texttt{len}, \texttt{isinstance},
+        etc. -- notably excluding \texttt{type}), so most static-analysis
+        bypasses that produce syntactically clean but semantically
+        unexpected code still fail at execution time.
+  \item \textbf{Wall-clock-bounded subprocess.} All training runs in a
+        \texttt{multiprocessing} subprocess (spawn context) with
+        \texttt{join(timeout)} followed by escalating
+        \texttt{terminate()}/\texttt{kill()} if the process is still alive.
+        This is the only layer that can stop resource-exhaustion or
+        infinite-loop attacks, which have no fixed syntactic signature for
+        the first two layers to catch.
+\end{enumerate}
+During development of this system we discovered and fixed a genuine
+deadlock in this subprocess layer: the original implementation called
+\texttt{Process.join()} \emph{before} draining the result queue, which
+deadlocks once the pickled result (e.g., serialized RL policy weights)
+exceeds the OS pipe buffer -- the child's queue-feeder thread blocks on
+\texttt{write()} waiting for a reader that will never arrive, while the
+parent blocks in \texttt{join()} waiting for a child that cannot exit. We
+mention this because it is exactly the kind of subtle correctness bug that
+empirical testing (Section~\ref{sec:exp2}, \ref{sec:exp4}) surfaces and
+code review alone would not have.
+
+\section{Experiments}
+\label{sec:experiments}
+
+All experiments were run on a single Apple Silicon machine (MPS, no CUDA,
+no 4/8-bit quantization support); wall-clock numbers should be read as
+characterizing this specific hardware, not general system throughput. The
+local LLM used throughout is Ollama's \texttt{qwen3.6:35b-a3b} (no API key,
+no external cost), except where noted.
+
+\subsection{Experiment 1: does the automatic sklearn backend match manually-chosen classical baselines?}
+\label{sec:exp1}
+
+We compare the system's zero-configuration sklearn backend
+(\texttt{Ours-Base}: automatic model-family selection by dataset size;
+\texttt{Ours-SMOTE}: the same, plus automatic SMOTE oversampling) against
+manually-specified classical baselines (TF-IDF + logistic regression,
+TF-IDF + linear SVM) on four datasets: 20 Newsgroups (4-class and binary
+subsets), a bundled 30-example customer-service-ticket dataset (5 classes),
+and \texttt{sepidmnorozy/Chinese\_sentiment} (a real, third-party Hugging
+Face dataset, included to cover the system's bilingual Chinese/English
+target use case). We sweep 10/20/50/100 examples per class and repeat every
+configuration 10 times, resampling which specific examples are drawn each
+repeat (seed $= 42 + \text{repeat}$) to obtain genuine variance --
+\emph{the underlying classifier's own random\_state is fixed at 42 by the
+evaluated system itself, a real property of the implementation we did not
+alter and report as a limitation (Section~\ref{sec:limitations})}, rather
+than paper over it.
+
+\textbf{We discovered and fixed two bugs in the (previously unrun)
+evaluation harness before trusting its output}: repeats had been drawing the
+identical subsample every time (making reported variance always exactly
+zero), and the Markdown-table export function called itself recursively
+with no base case, crashing with a \texttt{RecursionError} on its first real
+invocation. Both are described in Section~\ref{sec:limitations} and fixed in
+the accompanying code.
+
+\textbf{Result.} Table~\ref{tab:exp1} shows F1 (weighted) for
+\texttt{Ours-SMOTE} vs.\ the two baselines. A paired Wilcoxon signed-rank
+test across all 16 (dataset $\times$ sample-size) configurations shows no
+statistically significant difference in any comparison
+(\texttt{Ours-SMOTE} vs.\ LogReg: $p=0.379$; vs.\ SVM: $p=0.178$;
+\texttt{Ours-Base} vs.\ LogReg: $p=0.097$; all $n=16$). We report this
+honestly as a \emph{parity} finding rather than an improvement: the system
+matches hand-tuned classical baselines while requiring no manual model or
+hyperparameter choice from the user, which is the claim we can actually
+support -- not that automatic selection or SMOTE improves raw accuracy.
+
+We also note that the bundled 30-example ticket dataset produces
+near-floor F1 ($0.008$--$0.029$) for \emph{every} evaluated system,
+including the plain baselines, and identical results across all requested
+sample sizes (because the dataset has only $\sim$6 examples per class in
+total, well below what any of the four requested sample-size settings
+could actually supply). We report this as a genuine limit of the few-shot
+regime this system targets, not a bug specific to our method, since the
+plain sklearn baselines degrade identically.
+
+\begin{table}[t]
+\centering
+\caption{F1 (weighted), mean over 10 repeats, at $n{=}100$ examples/class.
+Full sweep (10/20/50/100) and per-repeat std.\ in \texttt{outputs/exp1\_sklearn\_baselines/}.}
+\label{tab:exp1}
+\small
+\begin{tabular}{lcccc}
+\toprule
+System & 20NG-4 & 20NG-2 & zh-sent. & tickets \\
+\midrule
+LogReg        & 0.7028 & 0.8800 & 0.7320 & 0.0083 \\
+SVM           & 0.7243 & 0.8890 & 0.7323 & 0.0083 \\
+Ours-Base     & 0.7145 & 0.8836 & 0.7094 & 0.0152 \\
+Ours-SMOTE    & 0.7160 & 0.8840 & 0.7074 & 0.0291 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Experiment 2: does the fallback ladder help, and how often does the LLM-generated tier actually work?}
+\label{sec:exp2}
+
+We compare \texttt{model\_backend=sklearn} against
+\texttt{model\_backend=custom\_nn} (which triggers the full ladder: an
+LLM-generated classification head, falling back to a fine-tuned pretrained
+backbone, falling back to sklearn, if earlier tiers fail validation or
+training) across 3 seeds on a real dataset at $n{=}20$/class.
+
+\textbf{Methodology deviation, disclosed.} The plan called for the
+bundled customer-ticket dataset, since it best matches this system's target
+use case; Experiment~\ref{sec:exp1} showed that dataset is too small
+(6 examples/class) to support a genuine $n{=}20$/class draw and produces
+degenerate results for every system. We substituted
+\texttt{chinese\_sentiment} (Section~\ref{sec:exp1}), which has enough
+examples to actually support the requested sample size, after discovering
+the problem empirically rather than assuming the original plan would work.
+
+\textbf{Result.} Table~\ref{tab:exp2} shows the outcome (full per-seed
+detail in \texttt{outputs/exp2\_fallback\_ladder/summary.json}). The
+LLM-generated custom\_nn tier succeeded on its very first attempt in 2 of 3
+seeds and needed exactly one in-tier retry (not a full fallback to the
+pretrained backbone or sklearn) in the third, so all 3 seeds were ultimately
+served by the LLM-generated classifier tier -- the fallback ladder never had
+to reach its second or third rung in this run. With only 3 seeds, the mean
+accuracy is not meaningfully different between conditions (0.657 sklearn vs.\
+0.563 ladder; the ladder's seed-2 run, at 0.27, is the visible outlier
+driving this). We report this honestly rather than only reporting favorable
+seeds: at this sample size we cannot claim the ladder improves accuracy,
+only that it reaches a working classifier via a qualitatively different
+route (LLM-generated code rather than a fixed model family) at comparable
+wall-clock cost, with graceful in-tier retry when the first generation
+attempt fails.
+
+\begin{table}[t]
+\centering
+\caption{Fallback ladder vs.\ sklearn-only, 3 seeds, $n{=}20$/class, \texttt{chinese\_sentiment}.}
+\label{tab:exp2}
+\small
+\begin{tabular}{lcc}
+\toprule
+ & sklearn-only & fallback ladder \\
+\midrule
+Mean best metric (accuracy) & 0.657 & 0.563 \\
+Mean wall-clock (s)         & 75.4  & 77.6 \\
+custom\_nn 1st-try success rate & --- & 0.667 \\
+Reached pretrained/sklearn tier & --- & 0/3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Experiment 3: static sandbox red-team evaluation}
+\label{sec:exp3}
+
+We construct a red-team suite of malicious and benign code samples against
+both sandboxes (classification-head and RL-environment), covering nine
+attack categories: dangerous imports (\texttt{os}, \texttt{subprocess},
+\texttt{socket}, \texttt{urllib}, \texttt{ctypes}), dangerous builtins
+(\texttt{eval}, \texttt{exec}, \texttt{open}, \texttt{getattr}), classic
+sandbox-escape dunder chains (\texttt{\_\_globals\_\_},
+\texttt{\_\_subclasses\_\_}), decorator-hidden calls, import-allowlist
+bypasses (\texttt{importlib.import\_module}, \texttt{\_\_import\_\_}), and
+structural violations (missing required methods/attributes, wrong base
+class, multiple top-level classes used to hide a payload in a helper class).
+Benign samples span simple/medium/complex legitimate architectures and
+environments.
+
+\textbf{Result.} Both sandboxes achieve perfect precision, recall, and
+accuracy on this suite (nn\_sandbox: 20 malicious + 8 benign, $28/28$
+correct; rl\_sandbox: 12 malicious + 5 benign, $17/17$ correct; see
+\texttt{outputs/exp3\_sandbox\_redteam/summary.json} for the full
+per-category breakdown). We are explicit about what this does and does not
+show: (a) it evaluates only the static AST layer in isolation, not the
+composition of all three defense layers, since constructing a working
+end-to-end exploit through all three was out of scope; (b) resource
+exhaustion (unbounded loops, unbounded memory growth per step) is
+\emph{not} evaluated here because it has no fixed syntactic signature for a
+static analyzer to key on by design -- the actual defense is the
+wall-clock subprocess timeout, which we verified fires correctly during
+real training runs in Experiments~\ref{sec:exp2} and~\ref{sec:exp4}, not
+the sandbox; (c) we separately found and report one genuine static-analysis
+gap discovered during this work: \texttt{class Evil(torch.random.Module)}
+passes \texttt{nn\_sandbox.validate()} because the base-class check inspects
+only the terminal attribute name (\texttt{"Module"}) via
+\texttt{ast.Attribute.attr}, not the full dotted path or an actual
+subclass relationship -- \texttt{torch.random} has no \texttt{Module}
+attribute, so this fails at actual \texttt{exec()} time with
+\texttt{AttributeError} rather than executing anything, i.e.\ it fails
+\emph{closed} at a different layer, but it is a real precision gap in the
+static layer's stated contract that we did not paper over.
+
+\subsection{Experiment 4: does LLM-synthesized RL environment generation actually work?}
+\label{sec:exp4}
+
+We hand-write 16 natural-language RL task descriptions spanning navigation,
+resource scheduling, simple games, and control, deliberately avoiding
+naming well-known benchmark environments (e.g., describing ``a pole
+balanced on a base that can move left or right'' rather than
+``CartPole''), to reduce the chance the LLM is reproducing memorized
+reference implementations rather than genuinely synthesizing an
+environment from the description. Each task is run once through the real
+pipeline (LLM environment synthesis $\to$ static validation, with one
+retry on failure $\to$ Stable-Baselines3 training).
+
+\textbf{Result.} Table~\ref{tab:exp4} summarizes the outcome (full
+per-task detail, including every failure reason, in
+\texttt{outputs/exp4\_rl\_env\_study/summary.json}). The static sandbox
+passes the generated environment on the first attempt 81\% of the time,
+but the pipeline only reaches a usable trained policy for 5 of 16 tasks
+(31\%) -- most tasks that pass the sandbox still fail later, and we
+tracked down why rather than leaving it as an unexplained gap.
+
+\textbf{Root cause, identified by direct diagnosis.} We manually re-ran two
+of the ten failed tasks (``room temperature control'' and ``inventory
+restocking'') with full event logging. Both failed at the exact same
+point, with the exact same message, from Gymnasium's own
+\texttt{check\_env} correctness checker (not our sandbox):
+\emph{``Deterministic step observations are not equivalent for the same
+seed and action.''} In both cases the LLM had written stochastic dynamics
+(ambient temperature drift; random daily demand) using Python's global
+\texttt{random} module or unseeded \texttt{numpy} calls directly, rather
+than routing randomness through \texttt{self.np\_random} -- the RNG that
+Gymnasium's own \texttt{Env.reset(seed=...)} sets up specifically so that
+environment transitions are reproducible given a seed. This is a
+mechanistic, actionable finding: the environment-design prompt does not
+currently instruct the LLM to use \texttt{self.np\_random} for stochastic
+transitions, and this appears to be the dominant cause of the gap between
+an 81\% sandbox pass rate and a 31\% end-to-end completion rate. The one
+remaining distinct failure mode we observed was the LLM's JSON response
+being truncated mid-string for one task (\texttt{elevator\_dispatch}),
+consistent with the response hitting the design call's 1800-token budget
+for a longer environment.
+
+Among the 5 completed tasks, reward improved from the first to the last
+training segment in 2 of 5 (mean improvement $+4.23$ where measured, but
+this average is dominated by one large positive outlier and should not be
+read as a typical effect size at $n=5$).
+
+\begin{table}[t]
+\centering
+\caption{RL environment synthesis study, 16 natural-language task descriptions.}
+\label{tab:exp4}
+\small
+\begin{tabular}{lc}
+\toprule
+Metric & Value \\
+\midrule
+Completion rate (usable trained policy)  & 0.313 (5/16) \\
+Sandbox pass rate (first try)            & 0.813 \\
+Mean wall-clock per task (s)             & 29.1 \\
+Runs with positive reward improvement    & 2/5 completed \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Limitations}
+\label{sec:limitations}
+
+We list these explicitly rather than folding them into future work, because
+several of them bound what can be concluded from Section~\ref{sec:experiments}.
+
+\begin{itemize}
+  \item \textbf{Simulated training curves in the sklearn backend.} The
+        sklearn backend's reported ``epoch'' is not a gradient-descent
+        epoch -- it is an increasing fraction of the training data
+        (30\%, 45\%, \ldots, 100\%) refit from scratch each step, a
+        legitimate way to visualize a learning curve for non-iterative
+        classifiers, but its reported \texttt{train\_loss}/\texttt{val\_loss}
+        values are \emph{not} measured losses: they are computed as
+        $\texttt{base\_loss} = 1 - \texttt{val\_metric}$ plus injected
+        Gaussian noise. We discovered this while preparing this paper and
+        do not report any loss-curve numbers as empirical results anywhere
+        in this paper -- only \texttt{val\_metric} (F1/accuracy, computed
+        by real \texttt{predict()} calls against a real held-out split) is
+        used.
+  \item \textbf{Fixed random seeds inside the evaluated system.} Every
+        sklearn classifier and train/validation split inside the evaluated
+        codebase uses a hardcoded \texttt{random\_state=42}. Our
+        multi-repeat variance in Experiment~\ref{sec:exp1} comes from
+        varying \emph{which examples} are subsampled per repeat, not from
+        varying the classifier's own internal randomness, which we did not
+        alter in the evaluated system.
+  \item \textbf{Small numbers of seeds for the expensive experiments.}
+        Experiment~\ref{sec:exp2} uses 3 seeds and
+        Experiment~\ref{sec:exp4} uses one run per task, both because a
+        single fallback-ladder or RL-synthesis run can take from under a
+        minute to (in the worst observed case for a cascading fallback
+        through pretrained-backbone fine-tuning) over 25 minutes on our
+        hardware. These results should be read as suggestive
+        characterizations, not high-power statistical claims.
+  \item \textbf{Concurrent-execution contamination, caught and discarded.}
+        Our first attempt at Experiment~\ref{sec:exp4} was run while
+        Experiment~\ref{sec:exp2} was still finishing on the same machine
+        (both compete for the same local Ollama instance and CPU); that run
+        showed an 18.75\% completion rate, including LLM responses
+        truncated mid-JSON under load. We discarded it (kept in the code
+        repository, under a directory suffixed \texttt{\_CONTENDED\_} \texttt{DISCARDED},
+        for audit purposes) and re-ran Experiment~\ref{sec:exp4} alone; the
+        numbers reported in Table~\ref{tab:exp4} are from the
+        uncontended re-run only. We flag this because it is a concrete
+        example of how easy it is for infrastructure-level contention to
+        masquerade as a model-level finding if results are not
+        cross-checked against the conditions they were collected under.
+  \item \textbf{No human-subject evaluation.} We do not evaluate whether
+        natural-language clarification dialogue elicits sufficient task
+        specification as effectively as an ML-literate user configuring
+        the system directly; that requires a real user study, which we did
+        not conduct.
+  \item \textbf{Sandbox evaluation scope.} Experiment~\ref{sec:exp3}
+        evaluates the static AST layer in isolation. We did not attempt to
+        construct a working end-to-end exploit chaining all three defense
+        layers, nor did we formally verify the restricted-\texttt{exec()}
+        layer's completeness.
+  \item \textbf{Coverage.} The system also supports vision-language
+        classification and generative vision-language fine-tuning in
+        ongoing work not covered by this paper; only text classification
+        and RL are evaluated here.
+\end{itemize}
+
+\section{Conclusion}
+We presented a conversational, multi-backend system that lets an LLM
+generate and safely execute real training code -- classification heads and
+full RL environments -- behind a layered, empirically red-teamed sandbox
+and a fallback ladder that degrades gracefully when generation fails. Our
+experiments are deliberately modest in scale and explicit about their
+limitations; we believe reporting real, reproducible numbers (including
+failures) is more useful to the community than a stronger-sounding but
+unverified claim.
+
+\bibliographystyle{plain}
+\begin{thebibliography}{99}
+
+\bibitem{autogluon} N.\ Erickson et al. AutoGluon-Tabular: Robust and
+Accurate AutoML for Structured Data. \emph{arXiv:2003.06505}, 2020.
+
+\bibitem{autosklearn} M.\ Feurer et al. Auto-sklearn 2.0: Hands-free
+AutoML via Meta-Learning. \emph{JMLR}, 2022.
+
+\bibitem{automlzero} E.\ Real et al. AutoML-Zero: Evolving Machine
+Learning Algorithms From Scratch. \emph{ICML}, 2020.
+
+\bibitem{eureka} Y.\ J.\ Ma et al. Eureka: Human-Level Reward Design via
+Coding Large Language Models. \emph{ICLR}, 2024.
+
+\bibitem{voyager} G.\ Wang et al. Voyager: An Open-Ended Embodied Agent
+with Large Language Models. \emph{arXiv:2305.16291}, 2023.
+
+\bibitem{sb3} A.\ Raffin et al. Stable-Baselines3: Reliable Reinforcement
+Learning Implementations. \emph{JMLR}, 2021.
+
+\bibitem{gymnasium} M.\ Towers et al. Gymnasium: A Standard Interface for
+Reinforcement Learning Environments. \emph{arXiv:2407.17032}, 2024.
+
+\bibitem{peft} E.\ J.\ Hu et al. LoRA: Low-Rank Adaptation of Large
+Language Models. \emph{ICLR}, 2022.
+
+\end{thebibliography}
+
+\end{document}

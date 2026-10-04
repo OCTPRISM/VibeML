@@ -1,0 +1,11 @@
+# ── 轻量本机版 升级包（可选） ────────────────────────────────────────────────
+#
+# 运行期：pip install -r requirements-desktop.txt
+# 构建安装包（仅在对应目标操作系统上才能产出该系统的原生安装包，
+# 跨平台交叉打包不可行——Windows/Linux 安装包需要在 Windows/Linux 上构建）：
+#   briefcase create && briefcase build && briefcase package
+
+pywebview>=6.0
+
+# 构建期依赖（不是运行期），用于产出 .app/.dmg（macOS）/.msi（Windows）/.deb/AppImage（Linux）
+briefcase>=0.3.20

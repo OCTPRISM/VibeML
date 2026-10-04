@@ -1,0 +1,50 @@
+[tool.briefcase]
+project_name = "Vibe ML Studio"
+bundle = "com.vibemlstudio"
+version = "0.4.0"
+license.file = "LICENSE"
+url = "https://vibemlstudio.example"
+author = "Vibe ML Studio"
+author_email = "support@vibemlstudio.example"
+
+[tool.briefcase.app.vibemlstudio]
+formal_name = "Vibe ML Studio"
+description = "对话式 AutoML 轻量本机版"
+# Briefcase 默认期望 src/<app>/ 的项目布局；本仓库结构是既有的、跑了整个会话
+# 验证过的 api/ + core/ + web/ + desktop_packaging/ 平铺布局，不为了适配打包
+# 工具去重排——用 sources 显式列出要打包进去的现有目录，而不是新建一个
+# src/vibemlstudio/ 再把代码挪进去（那样等于维护两份平行代码）。
+sources = [
+    "api",
+    "core",
+    "config.py",
+    "desktop_packaging",
+    "web",
+]
+# 真正的入口点——启动本地 uvicorn + pywebview 原生窗口，见 desktop_packaging/desktop_app.py
+entry_point = "desktop_packaging.desktop_app:main"
+requires = [
+    "fastapi",
+    "uvicorn",
+    "httpx",
+    "pydantic",
+    "pydantic-settings",
+    "sqlalchemy",
+    "psycopg[binary]",
+    "pyjwt",
+    "argon2-cffi",
+    "authlib",
+    "scikit-learn",
+    "numpy",
+    "pywebview",
+]
+
+[tool.briefcase.app.vibemlstudio.macOS]
+requires = ["std-nslog"]
+
+[tool.briefcase.app.vibemlstudio.linux]
+requires = ["pywebview[gtk]"]
+system_requires = ["libgtk-3-dev", "libwebkit2gtk-4.0-dev"]
+
+[tool.briefcase.app.vibemlstudio.windows]
+requires = ["pywebview[cef]"]

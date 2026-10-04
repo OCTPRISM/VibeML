@@ -1,0 +1,3795 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe ML Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #14181f;
+  --surface:   #1c2129;
+  --surface-2: #232934;
+  --border:    #2d3440;
+  --text:      #eef1f5;
+  --muted:     #8b93a3;
+  --amber:     #e8a33d;
+  --amber-dim: #8a6229;
+  --sage:      #7fb69e;
+  --coral:     #d97060;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
+  --serif: 'Source Serif 4', Georgia, serif;
+  --sans:  'Inter', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: var(--sans); line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--amber); }
+
+/* ── Header ─────────────────────────────────────────────────────── */
+header {
+  border-bottom: 1px solid var(--border);
+  padding: 18px 28px;
+  display: flex; align-items: baseline; gap: 14px;
+}
+.wordmark {
+  font-family: var(--mono); font-weight: 700; font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.wordmark .dot { color: var(--amber); }
+.tagline { font-size: 12.5px; color: var(--muted); }
+.queue-pill {
+  margin-left: auto; font-family: var(--mono); font-size: 11px;
+  color: var(--muted); border: 1px solid var(--border); border-radius: 20px;
+  padding: 4px 12px; display: flex; align-items: center; gap: 6px;
+}
+.queue-pill .n { color: var(--amber); font-weight: 600; }
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+.layout {
+  display: grid; grid-template-columns: 380px 1fr;
+  min-height: calc(100vh - 58px);
+}
+@media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+.panel-left {
+  border-right: 1px solid var(--border); padding: 24px;
+  background: var(--surface);
+}
+.panel-right { padding: 24px 32px; overflow-x: hidden; }
+
+.field-label {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+  display: block;
+}
+textarea, input[type=text], input[type=password], input[type=number] {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; padding: 10px 12px;
+  font-family: var(--sans); font-size: 13.5px; outline: none; resize: vertical;
+}
+textarea:focus, input:focus { border-color: var(--amber-dim); }
+.field { margin-bottom: 18px; }
+.field-hint { font-size: 11.5px; color: var(--muted); margin-top: 5px; line-height: 1.4; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.checkbox-row input { width: auto; }
+.provider-row { display: flex; flex-direction: column; gap: 8px; }
+.radio-row { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.radio-row input { width: auto; }
+.radio-row .hint { color: var(--muted); font-size: 11.5px; }
+/* 选中"商业 API Key 配置"/"自建服务配置"后，对应字段紧接着出现在同一个面板里，
+   而不是散落成好几条独立的行——用左边框把"选项之后紧跟的配置"框成一个整体 */
+.self-config-panel {
+  margin-top: 6px; padding: 10px 12px 4px 16px;
+  border-left: 2px solid var(--border);
+}
+/* "商业 API Key 配置"/"自建服务配置" 做成左右并排的标签页样式，标题就是这两个
+   选项的文字——复用 .source-tab 的视觉语言（数据来源那组 tab），保持全站一致 */
+.tab-titles { display: flex; gap: 4px; margin-top: 6px; padding-left: 18px; }
+.tab-title {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-family: var(--sans); font-size: 12px; padding: 8px 14px; border-radius: 5px 5px 0 0;
+  border: 1px solid var(--border); background: var(--bg); color: var(--muted); cursor: pointer;
+  /* 梯形标签页外形：上边窄、下边宽，两侧向外斜切 */
+  clip-path: polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%);
+}
+.tab-title input[type="radio"] { display: none; }
+.tab-title:has(input:checked) { background: var(--amber); border-color: var(--amber); color: #1a1406; font-weight: 600; }
+
+/* ── 聊天面板 ───────────────────────────────────────────────────── */
+.chat-panel { display: flex; flex-direction: column; height: 100%; }
+.chat-messages {
+  flex: 1; min-height: 240px; max-height: 50vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px;
+}
+.chat-bubble {
+  max-width: 88%; padding: 9px 13px; border-radius: 10px; font-size: 13.5px; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+}
+.chat-bubble.assistant { align-self: flex-start; background: var(--surface-2); border: 1px solid var(--border); }
+.chat-bubble.user { align-self: flex-end; background: var(--amber-dim); color: #fff2dc; }
+.chat-divider {
+  align-self: center; font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+  padding: 3px 10px; border: 1px solid var(--border); border-radius: 20px; margin: 2px 0;
+}
+.action-card {
+  border: 1px solid var(--amber-dim); border-radius: 8px; padding: 14px;
+  background: rgba(232,163,61,.05); margin-bottom: 12px;
+}
+.chat-input-row { display: flex; gap: 8px; margin-bottom: 16px; align-items: flex-end; }
+.chat-input-wrap { position: relative; flex: 1; }
+.chat-input-wrap textarea { width: 100%; box-sizing: border-box; resize: none; padding-left: 34px; }
+.chat-input-row .btn { width: auto; padding: 10px 16px; align-self: flex-end; }
+.chat-attach-btn {
+  position: absolute; left: 6px; bottom: 8px; width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; color: var(--muted); cursor: pointer;
+  padding: 0; border-radius: 4px;
+}
+.chat-attach-btn:hover { color: var(--text); background: var(--surface-2); }
+.chat-input-wrap.drag-over textarea {
+  outline: 2px dashed var(--amber); outline-offset: -2px; background: var(--surface-2);
+}
+.chat-input-wrap.drag-over::after {
+  content: "松开鼠标上传文件"; position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center; pointer-events: none;
+  font-size: 12.5px; color: var(--amber); background: rgba(232, 163, 61, 0.08);
+  border-radius: 6px;
+}
+.chat-attach-menu {
+  position: absolute; left: 0; bottom: calc(100% + 6px); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 8px; width: 240px; z-index: 50;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35); overflow: hidden; padding: 4px 0;
+}
+.chat-attach-menu-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  background: transparent; border: none; color: var(--text); font-family: var(--sans);
+  font-size: 13px; padding: 8px 12px; cursor: pointer;
+}
+.chat-attach-menu-item:hover { background: var(--surface); }
+.chat-attach-menu-item .attachment-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+}
+.chat-attach-menu-item img.attachment-thumb {
+  width: 18px; height: 18px; object-fit: cover; border-radius: 3px; flex-shrink: 0;
+}
+.chat-attach-menu-section { border-top: 1px solid var(--border); padding-top: 4px; margin-top: 4px; }
+.chat-attach-menu-label {
+  font-size: 10.5px; color: var(--muted); padding: 4px 12px 2px;
+  text-transform: uppercase; letter-spacing: .03em;
+}
+.chat-attach-menu-scroll { max-height: 150px; overflow-y: auto; }
+.chat-attach-menu-empty { font-size: 12px; color: var(--muted); padding: 6px 12px; }
+.pending-attachments-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.attachment-chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 220px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 8px; font-size: 12px; color: var(--text);
+}
+.attachment-chip img.attachment-thumb {
+  width: 20px; height: 20px; object-fit: cover; border-radius: 3px; flex-shrink: 0;
+}
+.attachment-chip .attachment-icon { flex-shrink: 0; color: var(--muted); }
+.attachment-chip .attachment-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+}
+.attachment-chip .attachment-remove {
+  flex-shrink: 0; border: none; background: transparent; color: var(--muted);
+  cursor: pointer; padding: 0 0 0 2px; font-size: 14px; line-height: 1;
+}
+.attachment-chip .attachment-remove:hover { color: var(--coral); }
+.attachment-chip.uploading { opacity: 0.6; }
+.attachment-chip.errored { border-color: var(--coral); }
+.chat-bubble .attachment-chip { cursor: default; }
+.chat-bubble .attachment-chip .attachment-remove { display: none; }
+.chat-bubble-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+.sessions-list { display: flex; flex-direction: column; gap: 6px; }
+.session-item {
+  display: flex; flex-direction: column; gap: 5px; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+  background: var(--bg); font-size: 12.5px; transition: border-color .15s;
+}
+.session-item:hover { border-color: var(--amber-dim); }
+.session-item.active { border-color: var(--amber); }
+.session-item.pinned { border-color: var(--amber-dim); }
+.session-item-row { display: flex; align-items: center; gap: 8px; }
+.session-item .desc {
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text);
+}
+.session-item .time { color: var(--muted); font-size: 11px; font-family: var(--mono); white-space: nowrap; }
+.session-item .actions { display: flex; gap: 2px; flex-shrink: 0; }
+.session-item .actions button {
+  border: none; background: transparent; color: var(--muted); cursor: pointer;
+  font-size: 12px; padding: 3px 5px; border-radius: 4px; line-height: 1; opacity: .55;
+}
+.session-item .actions button:hover { background: var(--border); color: var(--text); opacity: 1; }
+.session-item .actions button.active { opacity: 1; }
+.session-item .actions button.fork-btn { display: inline-flex; align-items: center; justify-content: center; }
+.session-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag-chip-mini {
+  font-size: 10.5px; color: var(--amber); background: var(--amber-dim);
+  border-radius: 3px; padding: 1px 6px; white-space: nowrap;
+}
+.api-origin-badge {
+  color: var(--text); background: var(--surface-2); font-weight: 600;
+  letter-spacing: .02em; flex-shrink: 0;
+}
+.session-stage-badge {
+  color: var(--text); background: var(--surface-2); flex-shrink: 0;
+  display: inline-flex; align-items: center;
+}
+.session-stage-badge .status-dot { margin-right: 4px; }
+
+/* ── 标签编辑模态框 ───────────────────────────────────────────────────── */
+.tag-chip-row, .tag-preset-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-chip {
+  border: 1px solid var(--amber-dim); background: var(--amber-dim); color: var(--amber);
+  border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer;
+}
+.tag-chip:hover { background: var(--coral); border-color: var(--coral); color: var(--bg); }
+.tag-preset-btn {
+  border: 1px solid var(--border); background: transparent; color: var(--muted);
+  border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; transition: all .15s;
+}
+.tag-preset-btn:hover { border-color: var(--amber-dim); color: var(--text); }
+.tag-preset-btn.active {
+  border-color: var(--amber); background: var(--amber-dim); color: var(--amber);
+}
+
+/* ── 数据来源 tabs ─────────────────────────────────────────────────────── */
+.source-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+.source-tab {
+  font-family: var(--sans); font-size: 12px; padding: 6px 10px; border-radius: 5px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--muted); cursor: pointer;
+}
+.source-tab.active { background: var(--amber); border-color: var(--amber); color: #1a1406; font-weight: 600; }
+.search-row { display: flex; gap: 8px; }
+.search-row input { flex: 1; }
+.dataset-results { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; max-height: 260px; overflow-y: auto; }
+.dataset-result-card {
+  border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; background: var(--bg);
+}
+.dataset-result-card .ds-ref { font-family: var(--mono); font-size: 12.5px; color: var(--text); font-weight: 600; }
+.dataset-result-card .ds-desc { font-size: 12px; color: var(--muted); margin: 4px 0 6px; line-height: 1.4; }
+.dataset-result-card .ds-meta { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.dataset-preview-card {
+  margin-top: 14px; border: 1px solid var(--amber-dim); border-radius: 8px; padding: 14px 16px;
+  background: rgba(232,163,61,.05);
+}
+.preview-rows {
+  max-height: 160px; overflow: auto; font-family: var(--mono); font-size: 11px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin: 8px 0 12px;
+}
+.preview-rows table { border-collapse: collapse; width: 100%; }
+.preview-rows th, .preview-rows td {
+  text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--border); white-space: nowrap;
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+}
+.preview-rows th { color: var(--muted); font-weight: 600; }
+#datasetPreviewCard select {
+  width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 8px 10px; font-family: var(--sans); font-size: 13px;
+}
+
+/* ── 图片上传卡片（IMAGE_CLASSIFICATION / VLM_GENERATIVE 任务）───────────── */
+.image-thumb-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px; margin: 10px 0;
+}
+.image-thumb-item {
+  border: 1px solid var(--border); border-radius: 6px; padding: 6px; background: var(--bg);
+}
+.image-thumb-item img {
+  width: 100%; height: 90px; object-fit: cover; border-radius: 4px; display: block; margin-bottom: 6px;
+}
+.image-thumb-item input, .image-thumb-item textarea {
+  width: 100%; font-size: 12px; padding: 5px 6px; margin-top: 4px;
+}
+.image-thumb-item textarea { resize: vertical; min-height: 40px; }
+
+.btn {
+  width: 100%; padding: 12px; border: none; border-radius: 6px;
+  background: var(--amber); color: #1a1406; font-weight: 600; font-size: 14px;
+  font-family: var(--sans); cursor: pointer; transition: filter .15s;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:disabled { background: var(--surface-2); color: var(--muted); cursor: not-allowed; }
+.btn-secondary {
+  background: transparent; border: 1px solid var(--border); color: var(--text);
+  width: auto; padding: 8px 16px; font-size: 13px;
+}
+/* 表格里的操作按钮：默认 .btn-secondary 的 8px/16px padding 在窄表格列里会把
+   第二个按钮挤出可视区，这里收紧一档，并允许换行（宁可竖着排两行，
+   也不能有按钮看不见——看不见的按钮等于功能不存在） */
+.btn-compact { padding: 4px 8px; font-size: 12px; }
+.table-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.btn-ghost {
+  background: transparent; border: none; color: var(--muted);
+  width: auto; padding: 6px 10px; font-size: 13px; font-family: var(--sans);
+  cursor: pointer; border-radius: 6px;
+}
+.btn-ghost:hover { color: var(--text); background: var(--surface-2); }
+.btn-icon {
+  background: transparent; border: none; color: var(--muted); cursor: pointer;
+  padding: 3px 5px; border-radius: 4px; line-height: 1; display: inline-flex;
+  align-items: center; justify-content: center; vertical-align: middle;
+}
+.btn-icon:hover { color: var(--text); background: var(--surface-2); }
+.token-masked { color: var(--muted); letter-spacing: .02em; }
+
+/* ── 登录态 / 头像 ─────────────────────────────────────────────────── */
+.auth-widget { margin-left: 14px; }
+.avatar-btn {
+  display: flex; align-items: center; gap: 8px; background: transparent; border: none;
+  color: var(--text); font-family: var(--sans); font-size: 13px; cursor: pointer; padding: 4px 6px;
+  border-radius: 20px;
+}
+.avatar-btn:hover { background: var(--surface-2); }
+.avatar-circle {
+  width: 26px; height: 26px; border-radius: 50%; background: var(--amber-dim);
+  color: #fff2dc; font-family: var(--mono); font-weight: 700; font-size: 11px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  background-size: cover; background-position: center;
+}
+.avatar-circle-lg { width: 56px; height: 56px; font-size: 20px; }
+.avatar-dropdown {
+  position: absolute; right: 0; top: calc(100% + 6px); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 8px; min-width: 160px; z-index: 50;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35); overflow: hidden;
+}
+.avatar-dropdown button {
+  display: block; width: 100%; text-align: left; background: transparent; border: none;
+  color: var(--text); font-family: var(--sans); font-size: 13px; padding: 10px 14px; cursor: pointer;
+}
+.avatar-dropdown button:hover { background: var(--surface); }
+
+/* ── 模态框（登录/注册/个人信息） ───────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(10,12,16,.6); z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 20px; width: 340px; max-width: 92vw;
+  /* 内容比视口高时（比如 API 密钥 tab 展开创建表单 + 已有 token 列表）弹窗本身
+     不再无限撑高溢出屏幕——限制最大高度、超出部分弹窗自己滚动，而不是让用户
+     看不到底部的按钮 */
+  max-height: 88vh; overflow-y: auto;
+}
+.modal-box-wide { width: 480px; }
+.modal-tabs { display: flex; align-items: center; gap: 4px; margin-bottom: 16px; }
+.modal-tab {
+  background: transparent; border: none; color: var(--muted); font-family: var(--sans);
+  font-size: 13px; padding: 6px 10px; cursor: pointer; border-radius: 6px;
+}
+.modal-tab.active { color: var(--text); background: var(--surface-2); }
+.modal-close {
+  margin-left: auto; background: transparent; border: none; color: var(--muted);
+  font-size: 18px; cursor: pointer; padding: 2px 8px; line-height: 1;
+}
+.modal-close:hover { color: var(--text); }
+
+.usage-table-wrap { max-height: 360px; overflow-y: auto; }
+.usage-table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-family: var(--mono); }
+.usage-table th, .usage-table td {
+  text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border);
+}
+.usage-table th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; }
+
+.example-count { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+.example-count.ok { color: var(--sage); }
+.example-count.err { color: var(--coral); }
+
+/* ── Status readout ─────────────────────────────────────────────── */
+.readout {
+  font-family: var(--mono); font-size: 12px; color: var(--muted);
+  border-top: 1px solid var(--border); margin-top: 20px; padding-top: 16px;
+}
+.readout-row { display: flex; justify-content: space-between; padding: 4px 0; }
+.readout-row .v { color: var(--text); }
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%; display: inline-block;
+  margin-right: 6px; background: var(--muted);
+}
+.status-dot.running { background: var(--amber); animation: pulse 1.1s infinite; }
+.status-dot.completed { background: var(--sage); }
+.status-dot.failed { background: var(--coral); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+/* ── Multi-Agent 模式：执行计划面板 ──────────────────────────────── */
+.plan-step {
+  display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; font-size: 13px;
+  color: var(--muted);
+}
+.plan-step .status-dot { margin-top: 5px; flex-shrink: 0; }
+.plan-step.current { color: var(--text); font-weight: 600; }
+.plan-step .note { font-size: 11.5px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+.agent-activity-feed {
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+  max-height: 200px; overflow-y: auto; font-size: 12px; color: var(--muted);
+  display: flex; flex-direction: column-reverse; gap: 4px;   /* 最新的活动排在最上面 */
+}
+.agent-resource-bar {
+  display: flex; flex-wrap: wrap; gap: 12px; margin: 6px 0 10px;
+  font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+}
+.agent-resource-bar span { white-space: nowrap; }
+.agent-resource-bar b { color: var(--amber); font-weight: 600; }
+.subagent-block {
+  margin-top: 6px; margin-left: 15px; padding: 4px 0 4px 10px;
+  border-left: 2px solid var(--border); font-size: 12px; color: var(--muted);
+}
+.subagent-block summary { cursor: pointer; display: flex; align-items: center; user-select: none; }
+.subagent-block summary .status-dot { margin-right: 6px; }
+.subagent-block[open] summary { color: var(--text); }
+/* 编排模式二选一开关放在输入框左下角，复用 .source-tab 那套紧凑药丸按钮样式，
+   不用 provider 配置那边的大梯形 tab（那是给全宽选项设计的，这里要紧凑） */
+.agent-config-panel {
+  margin-top: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg);
+}
+
+/* ── Right panel: empty state ──────────────────────────────────── */
+.empty-state {
+  height: 100%; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; color: var(--muted); text-align: center; padding: 60px 20px;
+}
+.empty-state .glyph { font-family: var(--mono); font-size: 32px; color: var(--border); margin-bottom: 12px; }
+.empty-state p { max-width: 380px; font-size: 13.5px; }
+
+/* ── Metric readout cards ──────────────────────────────────────── */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 18px 20px;
+}
+.card-label {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+}
+.metric-big { font-family: var(--mono); font-size: 34px; font-weight: 600; color: var(--amber); }
+.metric-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+.warn-chip {
+  display: block; background: rgba(217,112,96,.1); border: 1px solid rgba(217,112,96,.35);
+  color: var(--coral); border-radius: 5px; padding: 6px 10px; font-size: 12px;
+  margin-bottom: 6px;
+}
+
+/* ── Learning curve ────────────────────────────────────────────── */
+.chart-card { margin-bottom: 20px; }
+canvas { width: 100%; display: block; }
+
+/* ── Iteration journal (signature element) ────────────────────── */
+.journal-entry {
+  position: relative; padding: 18px 20px 18px 26px; margin-bottom: 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  border-left: 3px solid var(--border);
+}
+.journal-entry.positive { border-left-color: var(--sage); }
+.journal-entry.negative { border-left-color: var(--coral); }
+.journal-entry.pending  { border-left-color: var(--amber); }
+.journal-head {
+  display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px;
+  font-family: var(--mono);
+}
+.journal-iter-n { font-size: 12px; color: var(--muted); }
+.journal-metric { font-size: 15px; font-weight: 600; color: var(--text); }
+.journal-delta { font-size: 12px; }
+.journal-delta.up { color: var(--sage); }
+.journal-delta.down { color: var(--coral); }
+.journal-action {
+  margin-left: auto; font-size: 10.5px; letter-spacing: .04em;
+  padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); color: var(--muted);
+}
+.journal-body { font-family: var(--serif); font-size: 14.5px; line-height: 1.65; color: #d7dce4; }
+.journal-body .diag { color: var(--text); }
+.journal-body .cause { color: var(--muted); font-style: italic; margin-top: 6px; }
+.journal-body .rec { margin-top: 8px; }
+.journal-body .rec b { color: var(--sage); font-style: normal; font-family: var(--sans); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.epoch-ticks { display: flex; gap: 3px; margin-top: 10px; }
+.epoch-tick { width: 5px; height: 16px; background: var(--border); border-radius: 1px; align-self: flex-end; }
+
+/* ── Deploy card ───────────────────────────────────────────────── */
+.deploy-card {
+  background: linear-gradient(135deg, rgba(232,163,61,.07), transparent);
+  border: 1px solid var(--amber-dim);
+}
+.code-block {
+  font-family: var(--mono); font-size: 12px; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px;
+  white-space: pre-wrap; color: #c9cfd9; margin-top: 10px;
+}
+
+/* ── Predict tester ────────────────────────────────────────────── */
+.predict-row { display: flex; gap: 8px; margin-top: 12px; }
+.predict-row input { flex: 1; }
+.predict-result {
+  margin-top: 10px; font-family: var(--mono); font-size: 12.5px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.predict-result .item { display: flex; justify-content: space-between; gap: 10px;
+  padding: 6px 10px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border); }
+.predict-result .label { color: var(--amber); }
+
+/* ── Debug log (collapsed by default) ─────────────────────────── */
+details.log-panel { margin-top: 24px; }
+details.log-panel summary {
+  cursor: pointer; font-family: var(--mono); font-size: 11px; color: var(--muted);
+}
+.log-lines {
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px; max-height: 200px; overflow-y: auto; margin-top: 8px;
+}
+.log-lines div { padding: 2px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="wordmark">VIBE ML<span class="dot">·</span>STUDIO</span>
+  <span class="tagline">对话式 AutoML — 说清楚任务，剩下的交给闭环</span>
+  <span class="queue-pill" id="queuePill">队列 <span class="n" id="queueN">—</span></span>
+
+  <div class="auth-widget">
+    <div id="authLoggedOut">
+      <button class="btn-ghost" id="loginOpenBtn">登录</button>
+      <button class="btn-ghost" id="registerOpenBtn">注册</button>
+    </div>
+    <div id="authLoggedIn" style="display:none; position:relative">
+      <button class="avatar-btn" id="avatarBtn">
+        <span class="avatar-circle" id="avatarCircle"></span>
+        <span id="displayNameLabel"></span>
+      </button>
+      <div class="avatar-dropdown" id="avatarDropdown" style="display:none">
+        <button type="button" id="openConfigBtn">配置</button>
+        <button type="button" id="openProfileBtn">个人信息 / 安全设置</button>
+        <button type="button" id="openUsageBtn">本月用量</button>
+        <button type="button" id="logoutBtn">退出登录</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- 登录/注册 模态框 -->
+<div class="modal-overlay" id="authModalOverlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-tabs">
+      <button type="button" class="modal-tab active" id="authTabLogin">登录</button>
+      <button type="button" class="modal-tab" id="authTabRegister">注册</button>
+      <button type="button" class="modal-close" id="authModalCloseBtn">×</button>
+    </div>
+    <div id="authFormArea">
+      <div class="field">
+        <label class="field-label">邮箱</label>
+        <input type="text" id="authEmailInput" placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label class="field-label">密码</label>
+        <input type="password" id="authPasswordInput" placeholder="至少 8 位">
+      </div>
+      <div class="field" id="authDisplayNameField" style="display:none">
+        <label class="field-label">昵称（可选）</label>
+        <input type="text" id="authDisplayNameInput" placeholder="怎么称呼你">
+      </div>
+      <button type="button" class="btn" id="authSubmitBtn" style="width:100%">登录</button>
+      <div class="field-hint" id="authStatus"></div>
+      <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border)">
+        <button type="button" class="btn-secondary" id="googleLoginBtn" style="width:100%">使用 Google 登录</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Google 邮箱冲突：要求输入已有账号密码确认关联 -->
+<div class="modal-overlay" id="linkModalOverlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-tabs">
+      <span class="modal-tab active">关联已有账号</span>
+      <button type="button" class="modal-close" id="linkModalCloseBtn">×</button>
+    </div>
+    <div class="field-hint" style="margin-bottom:12px">
+      邮箱 <b id="linkEmailLabel"></b> 已经注册过。输入这个账号的密码即可把 Google 登录关联上去，
+      以后两种方式都能登录同一个账号。
+    </div>
+    <div class="field">
+      <label class="field-label">密码</label>
+      <input type="password" id="linkPasswordInput">
+    </div>
+    <button type="button" class="btn" id="linkSubmitBtn" style="width:100%">确认关联</button>
+    <div class="field-hint" id="linkStatus"></div>
+  </div>
+</div>
+
+<!-- 个人信息 / 安全设置 / 用量 模态框 -->
+<div class="modal-overlay" id="profileModalOverlay" style="display:none">
+  <div class="modal-box modal-box-wide">
+    <div class="modal-tabs">
+      <button type="button" class="modal-tab active" id="profileTabInfo">个人信息</button>
+      <button type="button" class="modal-tab" id="profileTabSecurity">安全设置</button>
+      <button type="button" class="modal-tab" id="profileTabUsage">本月用量</button>
+      <button type="button" class="modal-tab" id="profileTabConfig">配置</button>
+      <button type="button" class="modal-tab" id="profileTabApiKeys">API 密钥</button>
+      <button type="button" class="modal-tab" id="profileTabCompute">计算资源</button>
+      <button type="button" class="modal-close" id="profileModalCloseBtn">×</button>
+    </div>
+
+    <div id="profilePaneInfo">
+      <div class="field" style="display:flex; align-items:center; gap:14px">
+        <span class="avatar-circle avatar-circle-lg" id="profileAvatarPreview"></span>
+        <div>
+          <input type="file" id="avatarFileInput" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+          <button type="button" class="btn-secondary" id="avatarUploadBtn">更换头像</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">邮箱</label>
+        <div class="field-hint" id="profileEmailLabel" style="font-size:13px; color:var(--text)"></div>
+      </div>
+      <div class="field">
+        <label class="field-label">昵称</label>
+        <input type="text" id="profileDisplayNameInput">
+      </div>
+      <button type="button" class="btn" id="profileSaveBtn">保存</button>
+      <div class="field-hint" id="profileStatus"></div>
+    </div>
+
+    <div id="profilePaneSecurity" style="display:none">
+      <div class="field">
+        <label class="field-label">当前密码</label>
+        <input type="password" id="currentPasswordInput">
+      </div>
+      <div class="field">
+        <label class="field-label">新密码（至少 8 位）</label>
+        <input type="password" id="newPasswordInput">
+      </div>
+      <button type="button" class="btn" id="changePasswordBtn">修改密码</button>
+      <div class="field-hint" id="securityStatus"></div>
+    </div>
+
+    <div id="profilePaneUsage" style="display:none">
+      <div class="field-hint" id="usageSummaryLabel" style="margin-bottom:10px"></div>
+      <div class="usage-table-wrap">
+        <table class="usage-table" id="usageTable">
+          <thead>
+            <tr><th>时间</th><th>模型</th><th>Prompt</th><th>Completion</th><th>合计</th><th>任务</th></tr>
+          </thead>
+          <tbody id="usageTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 配置：模型提供方 + Multi-Agent 的 MCP/Skill 设置，原来内嵌在聊天面板里，
+         现在统一收进这里（点头像 → 配置），跟对话式交互的主界面分开——这些是
+         "全局设置，二选一/可选，不会同时使用"这类偏后台的配置，不是每条消息都
+         要看一眼的东西，放进个人信息同一个模态框更合适。 -->
+    <div id="profilePaneConfig" style="display:none">
+      <div class="agent-config-panel" id="agentConfigPanel">
+        <div class="field-hint" style="margin-bottom:8px">
+          一条消息可能触发多达 15 次 LLM 调用（Agent 会自主决定调用哪些工具、要不要重试），
+          系统托管免费额度会消耗得更快，自己的 API Key 实际花费也会更高。
+          如果所选模型的工具调用能力不稳定（本地小模型常见），系统会自动退回确定性流程并告知你。
+        </div>
+        <div class="field">
+          <label class="field-label">MCP 服务器地址（每行一个，可选）</label>
+          <textarea id="mcpServerUrlsInput" rows="2" placeholder="https://your-mcp-server.example.com/mcp"></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label">启用的内置 Skill（可选）</label>
+          <label class="checkbox-row"><input type="checkbox" name="agentSkill" value="dataset_search_tips"> 数据集搜索技巧</label>
+          <label class="checkbox-row"><input type="checkbox" name="agentSkill" value="arch_design_guidelines"> 架构设计规范</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">模型提供方（全局设置，二选一，不会同时使用）</label>
+
+        <!-- 每个顶层选项后面紧跟着它自己的子内容，不是把两个顶层选项放进同一个
+             容器、子内容再统一挂在容器外面——那样会导致"系统托管"的子选项视觉上
+             紧贴在"自己配置"下面，看起来像是后者的子项，实际上是前者的 -->
+        <label class="radio-row"><input type="radio" name="providerCategory" value="system_managed" id="categorySystemManaged" checked> 系统托管（免费额度，需登录）</label>
+
+        <!-- 系统托管下面：型号自动还是自己指定——不需要用户填 Key/地址（系统自己的账号），
+             "指定型号"选中时直接用系统自己的 Key 探测可用型号列表，不需要用户提供任何凭据 -->
+        <div class="provider-row" id="systemManagedModelModeRow" style="margin-top:6px; padding-left:18px; display:none">
+          <label class="radio-row"><input type="radio" name="systemManagedModelMode" value="auto" id="systemModelAuto" checked> 自动（推荐）</label>
+          <label class="radio-row"><input type="radio" name="systemManagedModelMode" value="specific" id="systemModelSpecific"> 指定型号</label>
+        </div>
+        <select id="systemManagedModelSelect" style="margin-top:8px; margin-left:18px; display:none;"></select>
+        <div class="field-hint" id="systemManagedModelStatus" style="margin-left:18px;"></div>
+
+        <label class="radio-row" style="margin-top:10px"><input type="radio" name="providerCategory" value="self_configured" id="categorySelfConfigured"> 自己配置（不限额度，自备地址/Key）</label>
+
+        <!-- "自己配置"下面正好两个选项：商业 API Key配置 / 自建服务配置，做成左右
+             并排的标签页——两个选项的文字就是标签页标题。标签页标题行和各自的
+             配置面板是两个独立的兄弟节点，不会出现"面板固定挂在其中一个标题下面，
+             不管选中哪个都不跟着挪"这种错位（之前踩过的坑，见上面自己配置那次改） -->
+        <div class="tab-titles" id="selfConfigTabRow" style="display:none">
+          <label class="tab-title" id="modeCommercialLabel">
+            <input type="radio" name="selfConfigMode" value="commercial" id="modeCommercial" checked> 商业 API Key 配置
+          </label>
+          <label class="tab-title" id="modeSelfHostedLabel">
+            <input type="radio" name="selfConfigMode" value="self_hosted" id="modeSelfHosted"> 自建服务配置
+          </label>
+        </div>
+
+        <div class="self-config-panel" id="commercialConfigPanel" style="display:none">
+          <!-- Anthropic 和 OpenAI 兼容协议的商业 API 走不同鉴权协议，各自独立、
+               紧跟着自己的配置控件，不放进同一个容器再把控件统一挂在容器外面——
+               那样会导致不管选中哪个，控件视觉上都固定挂在"OpenAI/其他兼容商业API"
+               下面（组里最后一项），跟前面几次一样的错位，这里同样要避免 -->
+          <label class="radio-row" id="commercialAnthropicLabel">
+            <input type="radio" name="commercialProvider" value="anthropic" id="commercialAnthropic" checked> Anthropic
+          </label>
+          <div id="anthropicConfigBlock" style="padding-left:18px; display:none">
+            <input type="password" id="anthropicApiKey" placeholder="sk-ant-..." style="margin-top:8px; display:none;">
+            <!-- 探测按钮/下拉/模型名等字段三个模式共用同一套 DOM 元素（不是
+                 credential，只是 UI 控件+已探测出的型号列表），运行时由 JS 挪到这里 -->
+            <div id="anthropicSharedSlot"></div>
+          </div>
+
+          <label class="radio-row" id="commercialOpenAILabel" style="margin-top:6px">
+            <input type="radio" name="commercialProvider" value="openai_compatible" id="commercialOpenAI"> OpenAI / 其他兼容商业 API
+          </label>
+          <div id="openaiConfigBlock" style="padding-left:18px; display:none">
+            <div id="openaiSharedSlot"></div>
+          </div>
+        </div>
+
+        <div class="self-config-panel" id="selfHostedConfigPanel" style="display:none">
+          <div id="selfHostedSharedSlot"></div>
+        </div>
+
+        <!-- 共用字段：llmBaseUrl/openaiCompatApiKey（自建服务地址+可选鉴权 token，
+             或者商业 openai 兼容 API 的地址覆盖+必填 Key）+ 探测按钮/下拉/模型名——
+             updateProviderUI() 会把整块挪进 anthropicSharedSlot / openaiSharedSlot /
+             selfHostedSharedSlot 三者之一，保证它始终出现在当前实际选中的那个
+             选项下面，不会不管选哪个都固定出现在同一个位置 -->
+        <div id="sharedProviderFields">
+          <input type="text" id="llmBaseUrl" style="margin-top:8px; display:none;">
+          <input type="password" id="openaiCompatApiKey" style="margin-top:8px; display:none;">
+          <!-- Ollama 用 /api/tags，其它服务（vLLM、商业 OpenAI 兼容 API 等）用标准
+               /v1/models，探测成功前不知道这是哪种协议，探测本身就是在回答这个问题 -->
+          <button type="button" class="btn-secondary" id="probeModelsBtn" style="margin-top:8px; display:none;">检测可用模型</button>
+          <div class="field-hint" id="probeStatus"></div>
+          <!-- 探测成功后填充这个下拉；选中某一项会把值同步写进下面的手动输入框，
+               探测失败/还没探测时手动输入框就是唯一的输入方式，两者不冲突 -->
+          <select id="modelSelectDropdown" style="margin-top:8px; display:none;"></select>
+          <input type="text" id="llmModelName" style="margin-top:8px; display:none;">
+        </div>
+
+        <div class="field-hint" id="providerHint"></div>
+      </div>
+    </div>
+
+    <!-- API 密钥：给外部调用方（脚本/其它系统）用的长期 token，每个 token 各自
+         带一份独立的 provider 配置——跟上面"配置" tab（浏览器自己用的、全局唯一
+         的一份）是两回事，所以没有直接复用同一套 DOM/JS，而是做了一个更简化的
+         版本（provider 四选一 + 对应字段），覆盖同样的 provider 范围但不需要
+         "系统托管自动/指定型号""商业/自建"这几层浏览器场景才需要的嵌套。 -->
+    <div id="profilePaneApiKeys" style="display:none">
+      <div class="field-hint" style="margin-bottom:10px">
+        每个 Token 各自绑定一份 provider 配置——外部调用方用这个 Token 发起对话时
+        不需要再传 provider/模型/Key，自动使用这里配置好的这一份。
+      </div>
+      <div class="usage-table-wrap">
+        <table class="usage-table" id="apiTokenTable">
+          <thead>
+            <tr><th>名称</th><th>Token</th><th>Provider</th><th>模型</th><th>创建时间</th><th>最近使用</th><th></th></tr>
+          </thead>
+          <tbody id="apiTokenTableBody"></tbody>
+        </table>
+      </div>
+      <button type="button" class="btn-secondary" id="newApiTokenBtn" style="margin-top:10px">+ 创建新 Token</button>
+
+      <div id="newApiTokenForm" style="display:none; margin-top:12px; border-top:1px solid var(--border); padding-top:12px">
+        <div class="field">
+          <label class="field-label">名称</label>
+          <input type="text" id="apiTokenNameInput" placeholder="比如：生产环境脚本">
+        </div>
+        <div class="field">
+          <label class="field-label">Provider</label>
+          <!-- 每个选项后面紧跟一个空的"槽位"容器，选中哪个就把下面唯一一份共用的
+               Key/地址输入框（#apiTokenSharedFields）搬进对应槽位——跟上面"配置" tab
+               里 updateProviderUI() 的 anthropicSharedSlot/openaiSharedSlot/
+               selfHostedSharedSlot 是同一个做法，不管选中哪个，展开的配置项都
+               紧挨着显示在这个选项下面，不会固定挂在最下面跟哪个都对不上。 -->
+          <label class="radio-row"><input type="radio" name="apiTokenProvider" value="system_managed" id="apiTokenProviderSystemManaged" checked> 系统托管（用当前账号的免费额度）</label>
+          <div id="apiTokenSystemManagedSlot" style="padding-left:18px"></div>
+
+          <label class="radio-row" style="margin-top:6px"><input type="radio" name="apiTokenProvider" value="anthropic" id="apiTokenProviderAnthropic"> Anthropic（自己的 Key）</label>
+          <div id="apiTokenAnthropicSlot" style="padding-left:18px"></div>
+
+          <label class="radio-row" style="margin-top:6px"><input type="radio" name="apiTokenProvider" value="ollama" id="apiTokenProviderOllama"> Ollama / 自建服务</label>
+          <div id="apiTokenOllamaSlot" style="padding-left:18px"></div>
+
+          <label class="radio-row" style="margin-top:6px"><input type="radio" name="apiTokenProvider" value="openai_compatible" id="apiTokenProviderOpenAI"> OpenAI 兼容协议</label>
+          <div id="apiTokenOpenAISlot" style="padding-left:18px"></div>
+        </div>
+
+        <!-- 跟"配置" tab 的 #sharedProviderFields 同一个思路——Key/地址/探测按钮/
+             模型名称全部打包在一起、整体搬到当前选中 provider 的槽位里，不管选
+             哪个都紧挨着显示在它下面；模型名称也放进这一整块，不再单独固定在
+             表单最下面。 -->
+        <div id="apiTokenSharedFields">
+          <div class="field" id="apiTokenBaseUrlField" style="display:none">
+            <label class="field-label">服务地址</label>
+            <input type="text" id="apiTokenBaseUrlInput" placeholder="http://localhost:11434">
+          </div>
+          <div class="field" id="apiTokenApiKeyField" style="display:none">
+            <label class="field-label" id="apiTokenApiKeyLabel">API Key</label>
+            <input type="password" id="apiTokenApiKeyInput">
+          </div>
+          <div class="field">
+            <label class="field-label">选择模型</label>
+            <!-- 不再需要单独一个"检测可用模型"按钮——下拉菜单本身就是自动检测出来的
+                 结果，切换 provider（system_managed 不需要额外字段）或填完 Key/地址
+                 后自动刷新一次；旁边的圆形箭头图标用来手动重新拉取最新列表 -->
+            <div style="display:flex; align-items:center; gap:6px">
+              <select id="apiTokenModelSelect" style="flex:1">
+                <option value="">（默认）</option>
+              </select>
+              <button type="button" class="btn-icon" id="apiTokenRefreshModelsBtn" title="刷新可用模型列表">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 8a5.5 5.5 0 1 1-1.87-4.13"></path><path d="M13.7 1.8v3.2h-3.2"></path></svg>
+              </button>
+            </div>
+            <div class="field-hint" id="apiTokenProbeStatus"></div>
+          </div>
+        </div>
+
+        <button type="button" class="btn" id="createApiTokenBtn">创建</button>
+        <button type="button" class="btn-secondary" id="cancelApiTokenBtn">取消</button>
+        <div class="field-hint" id="apiTokenCreateStatus"></div>
+      </div>
+    </div>
+
+    <div id="profilePaneCompute" style="display:none">
+      <div class="field-hint" style="margin-bottom:10px">
+        配置好之后，可以在发起训练时选择把任务提交到这些集群上跑，而不是在本机跑。
+        凭据（kubeconfig / SSH 私钥）保存后不再回显，需要修改就重新填一份。
+      </div>
+      <div class="usage-table-wrap">
+        <table class="usage-table" id="computeProfileTable">
+          <!-- 只留 4 列：这个弹窗宽度有限，塞 6 列会把最右边的操作按钮挤出可视区，
+               用户看不到"测试连接"就等于这个功能不存在。创建时间/凭据状态这些
+               次要信息合并进"目标"那一列的第二行小字里 -->
+          <thead>
+            <tr><th>名称</th><th>类型</th><th>目标</th><th></th></tr>
+          </thead>
+          <tbody id="computeProfileTableBody"></tbody>
+        </table>
+      </div>
+      <button type="button" class="btn-secondary" id="newComputeProfileBtn" style="margin-top:10px">+ 添加计算资源</button>
+
+      <div id="newComputeProfileForm" style="display:none; margin-top:12px; border-top:1px solid var(--border); padding-top:12px">
+        <div class="field">
+          <label class="field-label">名称</label>
+          <input type="text" id="computeNameInput" placeholder="比如：实验室 GPU 集群">
+        </div>
+        <div class="field">
+          <label class="field-label">调度器类型</label>
+          <!-- 跟 API 密钥那边的 provider 选择器同一个做法：每个选项后面紧跟一个
+               槽位，选中哪个就只显示哪一组字段——两种后端的字段差异很大，
+               全都平铺出来会让用户不知道该填哪些 -->
+          <label class="radio-row"><input type="radio" name="computeBackend" value="kubernetes" checked> Kubernetes</label>
+          <div id="computeK8sSlot">
+            <div class="field">
+              <label class="field-label">kubeconfig 内容（整份 YAML 粘贴进来）</label>
+              <textarea id="computeKubeconfigInput" rows="5" placeholder="apiVersion: v1&#10;kind: Config&#10;clusters: ..."></textarea>
+            </div>
+            <div class="field">
+              <label class="field-label">Namespace</label>
+              <input type="text" id="computeNamespaceInput" placeholder="default">
+            </div>
+            <div class="field">
+              <label class="field-label">训练容器镜像</label>
+              <input type="text" id="computeImageInput" placeholder="比如：registry.example.com/vibeml/trainer:latest">
+            </div>
+            <div class="row-2">
+              <div class="field">
+                <label class="field-label">CPU</label>
+                <input type="text" id="computeCpuInput" placeholder="2">
+              </div>
+              <div class="field">
+                <label class="field-label">内存</label>
+                <input type="text" id="computeMemoryInput" placeholder="4Gi">
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label">GPU 数量（不需要就留空）</label>
+              <input type="number" id="computeGpuInput" min="0" placeholder="0">
+            </div>
+          </div>
+
+          <label class="radio-row"><input type="radio" name="computeBackend" value="slurm"> Slurm</label>
+          <div id="computeSlurmSlot" style="display:none">
+            <div class="row-2">
+              <div class="field">
+                <label class="field-label">登录节点地址</label>
+                <input type="text" id="computeSlurmHostInput" placeholder="login.cluster.example.com">
+              </div>
+              <div class="field">
+                <label class="field-label">端口</label>
+                <input type="number" id="computeSlurmPortInput" placeholder="22">
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label">SSH 用户名</label>
+              <input type="text" id="computeSlurmUserInput" placeholder="your-username">
+            </div>
+            <div class="field">
+              <label class="field-label">SSH 私钥（PEM，必须是没有密码短语的密钥）</label>
+              <textarea id="computeSlurmKeyInput" rows="4" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
+            </div>
+            <div class="row-2">
+              <div class="field">
+                <label class="field-label">分区（partition）</label>
+                <input type="text" id="computeSlurmPartitionInput" placeholder="gpu">
+              </div>
+              <div class="field">
+                <label class="field-label">时间上限</label>
+                <input type="text" id="computeSlurmTimeInput" placeholder="02:00:00">
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label">远端工作目录</label>
+              <input type="text" id="computeSlurmWorkdirInput" placeholder="/home/your-username/vibeml">
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="btn" id="createComputeProfileBtn">保存</button>
+        <button type="button" class="btn-secondary" id="cancelComputeProfileBtn">取消</button>
+        <div class="field-hint" id="computeCreateStatus"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 创建 API token 成功后一次性展示原始 token——离开这个弹层之后再也拿不到明文，
+     只在数据库里存了哈希（跟 refresh token 同一个模式），所以必须在这一刻让用户
+     复制保存。 -->
+<div class="modal-overlay" id="rawTokenModalOverlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-tabs">
+      <span style="font-weight:600; color:var(--text)">Token 创建成功</span>
+      <button type="button" class="modal-close" id="rawTokenModalCloseBtn">×</button>
+    </div>
+    <div class="field-hint" style="color:var(--amber); margin-bottom:8px">
+      离开此页面后将无法再次查看，请立即复制保存。
+    </div>
+    <div class="code-block" id="rawTokenDisplay" style="word-break:break-all; user-select:all"></div>
+    <button type="button" class="btn-secondary" id="copyRawTokenBtn" style="margin-top:8px">复制</button>
+    <div class="field-hint" style="margin-top:10px">调用示例：</div>
+    <div class="code-block" id="rawTokenCurlExample" style="font-size:11px; word-break:break-all"></div>
+  </div>
+</div>
+
+<!-- 历史会话标签编辑：算法类别/业务标签两组预设快捷选项 + 自定义标签输入，
+     纯本地 localStorage 元数据，不需要登录也不需要同步给后端 -->
+<div class="modal-overlay" id="tagModalOverlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-tabs">
+      <span class="modal-tab active">编辑标签</span>
+      <button type="button" class="modal-close" id="tagModalCloseBtn">×</button>
+    </div>
+    <div class="field-hint" style="margin-bottom:6px">当前标签（点击移除）</div>
+    <div class="tag-chip-row" id="tagCurrentChips"></div>
+
+    <div class="field-hint" style="margin:16px 0 6px">算法类别（点击添加/移除）</div>
+    <div class="tag-preset-row" id="tagAlgorithmPresets"></div>
+
+    <div class="field-hint" style="margin:16px 0 6px">业务标签（点击添加/移除）</div>
+    <div class="tag-preset-row" id="tagBusinessPresets"></div>
+
+    <div class="field" style="margin-top:16px">
+      <label class="field-label">自定义标签</label>
+      <div style="display:flex; gap:8px">
+        <input type="text" id="tagCustomInput" placeholder="输入后回车或点添加">
+        <button type="button" class="btn-secondary" id="tagCustomAddBtn" style="flex-shrink:0">添加</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- ═══════════════ 左侧：对话式交互 ═══════════════ -->
+  <div class="panel-left">
+    <div class="chat-panel">
+
+      <div class="chat-messages" id="chatMessages"></div>
+
+      <!-- Multi-Agent 模式的执行计划面板：常驻元素，不走下面 ACTION_CARDS 那套
+           互斥展示逻辑——orchestration_mode==="multi_agent" 且收到第一条
+           agent_event 消息后才显示，展示 set_plan/update_step_status 产出的
+           步骤列表 + 实时工具调用活动流，靠重放 agent_event 消息重建，
+           不需要额外的服务端"当前计划"状态（跟右侧训练可视化靠重放
+           training_event 重建是同一个思路） -->
+      <div class="card" id="agentPlanCard" style="display:none; margin-bottom:16px">
+        <div class="card-label">执行计划（Multi-Agent）</div>
+        <!-- 资源用量条：Agent 模式一条消息可能触发十几次 LLM 调用，用户有权知道
+             这一轮到底花了多久、烧了多少 token，而不是只看到工具调用在滚 -->
+        <div class="agent-resource-bar" id="agentResourceBar" style="display:none">
+          <span id="agentResourceElapsed">—</span>
+          <span id="agentResourceTurns">—</span>
+          <span id="agentResourceTokens">—</span>
+        </div>
+        <div id="agentPlanSteps"></div>
+        <div class="agent-activity-feed" id="agentActivityFeed"></div>
+      </div>
+
+      <!-- 数据准备卡片：ui_hint === "data_picker" 时显示 -->
+      <div class="action-card" id="dataPickerCard" style="display:none">
+        <div class="source-tabs">
+          <button type="button" class="source-tab active" data-source="manual">手动粘贴</button>
+          <button type="button" class="source-tab" data-source="local_upload">本地上传</button>
+          <button type="button" class="source-tab" data-source="local_path">本地路径</button>
+          <button type="button" class="source-tab" data-source="huggingface">HF 搜索</button>
+          <button type="button" class="source-tab" data-source="modelscope">魔搭搜索</button>
+        </div>
+
+        <div class="source-panel" id="sourcePanel-manual">
+          <textarea id="examples" rows="8" placeholder="我的账号无法登录 | 账号问题
+付款一直失败 | 支付问题
+快递三天没更新 | 物流问题"></textarea>
+          <div class="example-count" id="exampleCount">0 条样本，0 个标签</div>
+          <button type="button" class="btn" id="useManualBtn" style="margin-top:8px">使用这些手动样本</button>
+        </div>
+
+        <div class="source-panel" id="sourcePanel-local_upload" style="display:none">
+          <input type="file" id="uploadFileInput" accept=".csv,.tsv,.json,.jsonl,.ndjson">
+          <button type="button" class="btn-secondary" id="uploadBtn" style="margin-top:8px">上传并预览</button>
+          <div class="field-hint" id="uploadStatus"></div>
+        </div>
+
+        <div class="source-panel" id="sourcePanel-local_path" style="display:none">
+          <input type="text" id="localPathInput" placeholder="/Users/you/data/train.csv（服务器本机路径）">
+          <button type="button" class="btn-secondary" id="localPathBtn" style="margin-top:8px">加载预览</button>
+          <div class="field-hint" id="localPathStatus"></div>
+        </div>
+
+        <div class="source-panel" id="sourcePanel-huggingface" style="display:none">
+          <div class="search-row">
+            <input type="text" id="hfSearchInput" placeholder="搜索 HuggingFace 数据集，如 imdb / sentiment">
+            <button type="button" class="btn-secondary" id="hfSearchBtn">搜索</button>
+          </div>
+          <div class="dataset-results" id="hfResults"></div>
+        </div>
+
+        <div class="source-panel" id="sourcePanel-modelscope" style="display:none">
+          <div class="search-row">
+            <input type="text" id="msSearchInput" placeholder="搜索魔搭数据集，如 情感分类">
+            <button type="button" class="btn-secondary" id="msSearchBtn">搜索</button>
+          </div>
+          <div class="dataset-results" id="msResults"></div>
+        </div>
+
+        <div class="dataset-preview-card" id="datasetPreviewCard" style="display:none">
+          <div class="card-label">数据预览</div>
+          <div class="preview-rows" id="previewSampleRows"></div>
+          <div class="row2">
+            <div class="field">
+              <label class="field-label">文本列</label>
+              <select id="textColSelect"></select>
+            </div>
+            <div class="field">
+              <label class="field-label">标签列</label>
+              <select id="labelColSelect"></select>
+            </div>
+          </div>
+          <button type="button" class="btn" id="useDatasetBtn">使用这个数据集</button>
+          <div class="field-hint" id="datasetUseStatus"></div>
+        </div>
+      </div>
+
+      <!-- 数据集自动推荐卡片：ui_hint === "dataset_recommendation" 时显示，内容由消息的 data 字段渲染 -->
+      <div class="action-card" id="datasetRecommendationCard" style="display:none">
+        <div id="recommendationCandidates"></div>
+        <button type="button" class="btn-secondary" id="recommendationPickManualBtn" style="margin-top:8px">还是自己选数据来源</button>
+      </div>
+
+      <!-- 图片分类数据卡片：ui_hint === "image_picker" 时显示（IMAGE_CLASSIFICATION 任务）
+           每张图上传后本地生成缩略图预览（不用服务器地址回显——浏览器已经有原始文件字节，
+           没必要多打一次请求），配一个标签输入框，提交时把 {image_path, label} 列表
+           打成 data_selected 结构化消息发出去，跟文本分类的手动样本走的是同一条路 -->
+      <div class="action-card" id="imagePickerCard" style="display:none">
+        <input type="file" id="imageFilesInput" accept="image/png,image/jpeg,image/webp,image/bmp" multiple style="display:none">
+        <button type="button" class="btn-secondary" id="imageFilesBtn">选择图片（可多选，至少 6 张、覆盖 2 个类别）</button>
+        <div class="field-hint" id="imageUploadStatus"></div>
+        <div class="image-thumb-grid" id="imageThumbGrid"></div>
+        <button type="button" class="btn" id="imageExamplesSubmitBtn" style="margin-top:10px">提交</button>
+      </div>
+
+      <!-- 生成式 VLM 数据卡片：ui_hint === "vlm_picker" 时显示（VLM_GENERATIVE 任务）
+           每条样本除了图片，还需要一个问题/指令 + 一个参考答案（有参考答案才能打分） -->
+      <div class="action-card" id="vlmPickerCard" style="display:none">
+        <input type="file" id="vlmFilesInput" accept="image/png,image/jpeg,image/webp,image/bmp" multiple style="display:none">
+        <button type="button" class="btn-secondary" id="vlmFilesBtn">选择图片（可多选，至少 4 张）</button>
+        <div class="field-hint" id="vlmUploadStatus"></div>
+        <div class="image-thumb-grid" id="vlmThumbGrid"></div>
+        <button type="button" class="btn" id="vlmExamplesSubmitBtn" style="margin-top:10px">提交</button>
+      </div>
+
+      <!-- 训练后端卡片：ui_hint === "backend_picker" 时显示 -->
+      <div class="action-card" id="backendPickerCard" style="display:none">
+        <div class="provider-row">
+          <label class="radio-row"><input type="radio" name="modelBackendChat" value="sklearn" checked> sklearn（快，几秒内出结果）</label>
+          <label class="radio-row"><input type="radio" name="modelBackendChat" value="pretrained_nn"> 预训练模型微调（真实神经网络，较慢）</label>
+          <label class="radio-row"><input type="radio" name="modelBackendChat" value="custom_nn"> LLM 自定义网络结构〔实验性〕</label>
+        </div>
+        <button type="button" class="btn" id="backendConfirmBtn" style="margin-top:10px">确认</button>
+      </div>
+
+      <!-- 训练参数卡片：ui_hint === "training_config" 时显示 -->
+      <div class="action-card" id="trainingConfigCard" style="display:none">
+        <div class="row2">
+          <div class="field">
+            <label class="field-label">最大迭代轮数</label>
+            <input type="number" id="chatMaxIterations" value="3" min="1" max="10">
+          </div>
+          <div class="field">
+            <label class="field-label">目标指标</label>
+            <input type="number" id="chatTargetMetric" value="0.80" min="0" max="1" step="0.05">
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px">
+          <button type="button" class="btn-secondary" id="trainingConfigDefaultBtn" style="flex:1">使用默认</button>
+          <button type="button" class="btn" id="trainingConfigConfirmBtn" style="flex:1">确认</button>
+        </div>
+      </div>
+
+      <div class="pending-attachments-row" id="pendingAttachmentsRow" style="display:none"></div>
+      <div class="chat-input-row">
+        <div class="chat-input-wrap">
+          <textarea id="chatInput" rows="2" placeholder="说点什么…（比如任务描述，或者回复上面的问题）"></textarea>
+          <input type="file" id="chatAttachInput" multiple
+                 accept=".pdf,.doc,.docx,.xls,.xlsx,.md,.markdown,.txt,.jpg,.jpeg,.png,.svg,.eps,.zip,.7z,.tar,.gz,.tgz,.bz2,.tbz2,.xz,.txz,.rar"
+                 style="display:none">
+          <button type="button" class="chat-attach-btn" id="chatAttachBtn" title="添加文件">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13.5 6.5 7.4 12.6a3 3 0 1 1-4.24-4.24l6.1-6.1a2 2 0 1 1 2.83 2.83l-6.1 6.1a1 1 0 1 1-1.42-1.42l5.4-5.4"></path>
+            </svg>
+          </button>
+          <div class="chat-attach-menu" id="chatAttachMenu" style="display:none">
+            <button type="button" class="chat-attach-menu-item" id="chatAttachUploadItem">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V2m0 0L4.5 5.5M8 2l3.5 3.5"></path><path d="M2.5 10.5v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"></path></svg>
+              上传文件/图片
+            </button>
+            <div class="chat-attach-menu-section" id="chatAttachConvSection" style="display:none">
+              <div class="chat-attach-menu-label">本次对话中的文件</div>
+              <div id="chatAttachConvList" class="chat-attach-menu-scroll"></div>
+            </div>
+            <div class="chat-attach-menu-section">
+              <div class="chat-attach-menu-label">添加历史会话</div>
+              <div id="chatAttachHistoryList" class="chat-attach-menu-scroll"></div>
+            </div>
+          </div>
+        </div>
+        <button class="btn" id="chatSendBtn">发送</button>
+      </div>
+
+      <!-- 编排模式的二选一开关已移除：现在统一走 Multi-Agent，不再让用户
+           在"传统方式/Multi-Agent"之间选。确定性状态机没有删掉，而是降级成
+           **内部兜底**——模型工具调用不可靠时（本地小模型常见）自动退回它，
+           并如实告诉用户发生了切换，见 core/agent/agent_orchestrator.py
+           里的 tool_call 计数与 fallback 分支。这样界面是干净的单一模式，
+           弱模型的可用性也不倒退。 -->
+
+      <div class="field" id="sessionsBlock" style="display:none">
+        <label class="field-label">历史对话（本机浏览器记录）</label>
+        <div class="sessions-list" id="sessionsList"></div>
+      </div>
+
+      <details class="log-panel">
+        <summary>原始事件日志</summary>
+        <div class="log-lines" id="logLines"></div>
+      </details>
+    </div>
+  </div>
+
+  <!-- ═══════════════ 右侧：训练过程可视化 ═══════════════ -->
+  <div class="panel-right" id="rightPanel">
+    <div class="empty-state" id="emptyState">
+      <div class="glyph">◌</div>
+      <p>填写左侧任务描述和训练样本，点击"开始训练"。<br>这里会实时显示解析结果、学习曲线，和每一轮训练的可读诊断。</p>
+    </div>
+
+    <div id="resultsArea" style="display:none">
+      <div class="grid2">
+        <div class="card">
+          <div class="card-label">当前指标</div>
+          <div class="metric-big" id="curMetric">—</div>
+          <div class="metric-sub" id="curMetricSub">等待训练开始</div>
+        </div>
+        <div class="card">
+          <div class="card-label">数据情况</div>
+          <div class="metric-big" id="dataCount">—</div>
+          <div class="metric-sub" id="dataSub">—</div>
+        </div>
+      </div>
+
+      <div id="warningsArea"></div>
+
+      <div class="card" id="archCard" style="display:none">
+        <div class="card-label">模型架构</div>
+        <div id="archBody"></div>
+      </div>
+
+      <div class="card chart-card">
+        <div class="card-label">学习曲线</div>
+        <canvas id="chart" height="130"></canvas>
+      </div>
+
+      <div id="journal"></div>
+
+      <div class="card deploy-card" id="deployCard" style="display:none">
+        <div class="card-label">部署包</div>
+        <div id="deployBody"></div>
+        <div class="predict-row">
+          <input type="text" id="predictInput" placeholder="输入一段文本试试预测…">
+          <button class="btn-secondary" id="predictBtn">预测</button>
+        </div>
+        <div class="predict-result" id="predictResult"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initialState, reduceEvent } from "./app.js";
+
+const API_BASE = ""; // 同源部署时留空；跨域时改成 "http://localhost:8000"
+const SESSIONS_KEY = "vibeml_conversations";
+const MAX_SESSIONS = 20;
+
+let state = initialState();
+let ws = null;
+let conversationId = null;
+let trainingActive = false;
+// "web"（浏览器发起，能回复）| "api"（外部 API token 发起，网页只读查看）——
+// 见 renderSessions() 里的"API"徽标 和 updateChatInputForOrigin() 的输入框禁用逻辑
+let currentSessionOrigin = "web";
+// 登录态（下面账号体系那一大块用到）——提前声明在这里，避免 updateProviderUI()
+// 在页面加载时就引用 authState 却因为 let 的暂时性死区还没执行到声明处而报错
+let authState = { accessToken: null, user: null };
+
+// ── DOM refs ────────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+const examplesInput   = $("examples");
+const exampleCountEl  = $("exampleCount");
+const emptyState      = $("emptyState");
+const resultsArea     = $("resultsArea");
+const logLines        = $("logLines");
+const openaiCompatApiKeyInput = $("openaiCompatApiKey");
+const anthropicApiKeyInput = $("anthropicApiKey");
+const providerHint    = $("providerHint");
+const llmBaseUrlInput = $("llmBaseUrl");
+const llmModelNameInput = $("llmModelName");
+const systemManagedModelModeRow = $("systemManagedModelModeRow");
+const systemManagedModelSelect  = $("systemManagedModelSelect");
+const systemManagedModelStatus  = $("systemManagedModelStatus");
+const selfConfigTabRow = $("selfConfigTabRow");
+const commercialConfigPanel = $("commercialConfigPanel");
+const selfHostedConfigPanel = $("selfHostedConfigPanel");
+const commercialAnthropicLabel = $("commercialAnthropicLabel");
+const commercialOpenAILabel = $("commercialOpenAILabel");
+const anthropicConfigBlock = $("anthropicConfigBlock");
+const openaiConfigBlock = $("openaiConfigBlock");
+const anthropicSharedSlot = $("anthropicSharedSlot");
+const openaiSharedSlot = $("openaiSharedSlot");
+const selfHostedSharedSlot = $("selfHostedSharedSlot");
+const sharedProviderFields = $("sharedProviderFields");
+const probeModelsBtn = $("probeModelsBtn");
+const probeStatus = $("probeStatus");
+const modelSelectDropdown = $("modelSelectDropdown");
+// 自建服务探测出来的实际协议（"ollama" | "openai_compatible"）——探测前不知道
+// 这是哪种协议，默认按 ollama 处理（沿用之前的默认值），探测明确识别出别的协议才改写
+let selfHostedDetectedProtocol = null;
+const chatMessages    = $("chatMessages");
+const chatInput       = $("chatInput");
+const chatSendBtn     = $("chatSendBtn");
+
+const ACTION_CARDS = {
+  data_picker:            $("dataPickerCard"),
+  backend_picker:         $("backendPickerCard"),
+  training_config:        $("trainingConfigCard"),
+  dataset_recommendation: $("datasetRecommendationCard"),
+  image_picker:           $("imagePickerCard"),
+  vlm_picker:             $("vlmPickerCard"),
+};
+function hideActionCards() {
+  for (const el of Object.values(ACTION_CARDS)) el.style.display = "none";
+}
+function showActionCard(hint) {
+  hideActionCards();
+  const el = ACTION_CARDS[hint];
+  if (el) el.style.display = "block";
+}
+
+// ── Multi-Agent 模式：编排方式二选一 + 执行计划面板 ───────────────────────
+// orchestration_mode 只在创建对话（ensureConversation）时生效一次——切换这个
+// 开关对已经在跑的对话没有意义，跟"模型提供方"配置只在对话开始前生效是同一个约定
+// 统一走 Multi-Agent（前端不再提供模式选择）。仍然把这个字段发给后端，
+// 因为 CreateConversationRequest 的契约没变，而且后端内部降级需要知道
+// "用户要的是 Agent 模式"这个前提
+const orchestrationMode = "multi_agent";
+// MCP/Skill 配置面板本身（agentConfigPanel）现在常驻显示在头像 →「配置」
+// 模态框里，不再靠这里的模式切换来控制它的显隐——那块面板显不显示只取决于
+// 用户有没有打开这个模态框、切没切到"配置"这个 tab
+const mcpServerUrlsInput   = $("mcpServerUrlsInput");
+const agentPlanCard        = $("agentPlanCard");
+const agentPlanSteps       = $("agentPlanSteps");
+const agentActivityFeed    = $("agentActivityFeed");
+
+// Plan 面板状态是纯前端的一份普通数组，靠重放 agent_event 消息重建——完全独立于
+// web/app.js::reduceEvent 那套状态机，不会影响它或它的 28 个测试。
+// currentStepIndex 跟踪"最近一次被标记 in_progress 的步骤"——子 Agent 派生事件
+// 到达时没有自带"属于哪一步"的字段（那是模型的自由裁量），用这个做一个合理的
+// 嵌套位置启发式：模型按现有 system prompt 的约定，通常会先调用
+// update_step_status(index, "in_progress") 再去做那一步实际的工作（含派生子
+// Agent），所以到 subagent_spawned 事件抵达时，这个值几乎总是"正确"的那一步。
+let agentPlanState = { steps: [], currentStepIndex: null };
+
+function renderPlanSteps() {
+  agentPlanSteps.innerHTML = agentPlanState.steps.map((s, i) => {
+    const dotClass = s.status === "in_progress" ? "running"
+                    : s.status === "done" ? "completed"
+                    : s.status === "failed" ? "failed" : "";
+    const isCurrent = s.status === "in_progress";
+    const subagentsHtml = (s.subagents || []).map(sa => {
+      const saDotClass = sa.status === "running" ? "running" : sa.status === "failed" ? "failed" : "completed";
+      return `<details class="subagent-block">
+        <summary><span class="status-dot ${saDotClass}"></span>子 Agent「${escapeHtml(sa.role)}」${sa.status === "running" ? "运行中…" : "已完成"}</summary>
+        <div class="field-hint" style="margin-top:4px">${escapeHtml(sa.task_description)}</div>
+        ${sa.summary ? `<div class="note" style="margin-top:4px">${escapeHtml(sa.summary)}</div>` : ""}
+      </details>`;
+    }).join("");
+    return `<div class="plan-step${isCurrent ? " current" : ""}">
+      <span class="status-dot ${dotClass}"></span>
+      <div style="flex:1">${escapeHtml(s.text)}${s.note ? `<div class="note">${escapeHtml(s.note)}</div>` : ""}${subagentsHtml}</div>
+    </div>`;
+  }).join("");
+}
+
+function appendActivityLine(text) {
+  const line = document.createElement("div");
+  line.className = "activity-line";
+  line.textContent = text;
+  agentActivityFeed.prepend(line);   // 最新的排最上面（配合 column-reverse 布局）
+  while (agentActivityFeed.children.length > 30) agentActivityFeed.removeChild(agentActivityFeed.lastChild);
+}
+
+function renderAgentEvent(payload, data) {
+  agentPlanCard.style.display = "block";
+  const kind = data && data.kind;
+  if (kind === "plan_created") {
+    agentPlanState.steps = (data.steps || []).map(text => ({ text, status: "pending", note: "", subagents: [] }));
+    agentPlanState.currentStepIndex = null;
+    renderPlanSteps();
+  } else if (kind === "plan_step_update") {
+    const step = agentPlanState.steps[data.index];
+    if (step) {
+      step.status = data.status || step.status;
+      step.note = data.note || "";
+      if (data.status === "in_progress") agentPlanState.currentStepIndex = data.index;
+      renderPlanSteps();
+    }
+  } else if (kind === "subagent_spawned") {
+    const idx = agentPlanState.currentStepIndex != null
+      ? agentPlanState.currentStepIndex : agentPlanState.steps.length - 1;
+    const step = agentPlanState.steps[idx];
+    if (step) {
+      step.subagents = step.subagents || [];
+      step.subagents.push({
+        id: data.subagent_id, role: data.role, task_description: data.task_description,
+        status: "running", summary: "",
+      });
+      renderPlanSteps();
+    }
+    appendActivityLine(payload);
+  } else if (kind === "subagent_done") {
+    for (const step of agentPlanState.steps) {
+      const sa = (step.subagents || []).find(x => x.id === data.subagent_id);
+      if (sa) {
+        sa.status = data.success === false ? "failed" : "done";
+        sa.summary = data.summary || "";
+        break;
+      }
+    }
+    renderPlanSteps();
+    appendActivityLine(payload);
+  } else if (kind === "fallback_to_workflow") {
+    // 降级要在主聊天流里明确告诉用户，不能只在活动流小窗里一闪而过——
+    // "为什么没有 Agent 的决策过程了"是用户一定会问的问题
+    if (payload) appendChatBubble("assistant", payload);
+    appendActivityLine("⚠ 已切换到确定性流程");
+  } else if (kind === "resource_usage") {
+    // 资源用量单独更新顶部那条统计栏，不往活动流里刷——每轮都刷一条
+    // "耗时 xx 秒"会把真正有信息量的工具调用记录淹掉
+    updateAgentResourceBar(data);
+  } else if (kind === "final") {
+    // 最终总结要在主聊天流里显眼可见，不能只留在活动流小窗里——
+    // 这是 finish_run 工具或者模型不调用任何工具直接回复文字时产出的
+    if (payload) appendChatBubble("assistant", payload);
+  } else if (payload) {
+    // 工具调用带了耗时的话，在活动流那一行后面缀上——用户能一眼看出
+    // 是哪一步在耗时，而不是只觉得"Agent 卡住了"
+    const ms = data && data.duration_ms;
+    appendActivityLine(ms ? `${payload}（${(ms / 1000).toFixed(1)}s）` : payload);
+  }
+}
+
+function updateAgentResourceBar(data) {
+  if (!data) return;
+  const bar = $("agentResourceBar");
+  bar.style.display = "flex";
+  const elapsed = (data.elapsed_ms || 0) / 1000;
+  const llmMs = (data.cumulative_llm_ms || 0) / 1000;
+  $("agentResourceElapsed").innerHTML = `已运行 <b>${elapsed.toFixed(1)}s</b>`;
+  $("agentResourceTurns").innerHTML = `第 <b>${data.turn || "?"}</b> 轮思考 · LLM 累计 <b>${llmMs.toFixed(1)}s</b>`;
+  // 本地模型（Ollama 等）不一定回传 token 用量，没有就不显示这一项，
+  // 而不是显示一个误导性的 0
+  $("agentResourceTokens").innerHTML = data.cumulative_tokens
+    ? `累计 <b>${data.cumulative_tokens.toLocaleString()}</b> tokens` : "";
+}
+
+// ── 模型提供方切换：顶层是"系统托管"和"自己配置"两个互斥类别（决定配额/计费归属）。
+// "自己配置"下面按"谁运营这个服务"二选一——商业 API Key / 自建服务——而不是按协议
+// 三选一：协议（Ollama 原生 / OpenAI 兼容）是实现细节，交给下面的"检测可用模型"
+// 探测逻辑自动判断，用户只需要说清楚"我是要填商业 Key 还是自建地址"。
+// 商业 API 里 Anthropic 和 OpenAI 兼容协议的商业 API（OpenAI 官方/Azure OpenAI 等）
+// 走完全不同的鉴权协议，还需要再分一层。三个鉴权字段（Anthropic Key / OpenAI 兼容
+// 协议的 Key）用完全独立的 DOM 元素，切换选项时互不可见也互不复用，从根本上避免
+// "填了一个 Key 之后切到别的选项，Key 被当成别的东西发出去"这种凭据串用风险。──
+function currentCategory() {
+  return document.querySelector('input[name="providerCategory"]:checked').value;
+}
+function currentSelfConfigMode() {
+  const el = document.querySelector('input[name="selfConfigMode"]:checked');
+  return el ? el.value : "commercial";
+}
+function currentCommercialProvider() {
+  const el = document.querySelector('input[name="commercialProvider"]:checked');
+  return el ? el.value : "anthropic";
+}
+function currentSystemManagedModelMode() {
+  const el = document.querySelector('input[name="systemManagedModelMode"]:checked');
+  return el ? el.value : "auto";
+}
+function currentProvider() {
+  const category = currentCategory();
+  if (category === "system_managed") return "system_managed";
+  if (currentSelfConfigMode() === "commercial") return currentCommercialProvider();
+  return selfHostedDetectedProtocol || "ollama";   // 自建服务：默认当 ollama，探测识别出别的协议才改写
+}
+function updateProviderUI() {
+  const category    = currentCategory();
+  const isSystem    = category === "system_managed";
+  const isSelfConf  = category === "self_configured";
+  const mode        = currentSelfConfigMode();
+  const isCommercial  = isSelfConf && mode === "commercial";
+  const isSelfHosted  = isSelfConf && mode === "self_hosted";
+  const commercialProvider   = currentCommercialProvider();
+  const isCommercialAnthropic = isCommercial && commercialProvider === "anthropic";
+  const isCommercialOpenAI    = isCommercial && commercialProvider === "openai_compatible";
+  const showModelPicker = isCommercialAnthropic || isCommercialOpenAI || isSelfHosted;
+  const isSystemSpecific = isSystem && currentSystemManagedModelMode() === "specific";
+
+  systemManagedModelModeRow.style.display = isSystem ? "flex" : "none";
+  systemManagedModelSelect.style.display  = isSystemSpecific ? "block" : "none";
+  if (!isSystem) {
+    systemManagedModelSelect.innerHTML = "";
+    systemManagedModelStatus.textContent = "";
+  } else if (isSystemSpecific && !systemManagedModelSelect.options.length) {
+    probeSystemManagedModels();
+  }
+
+  selfConfigTabRow.style.display       = isSelfConf ? "flex" : "none";
+  commercialConfigPanel.style.display = isCommercial ? "block" : "none";
+  selfHostedConfigPanel.style.display = isSelfHosted ? "block" : "none";
+
+  // Anthropic / OpenAI 兼容各自独立、紧跟自己的配置块，同样不能把两个选项分组、
+  // 再把控件统一挂在组外面——那样控件视觉上会固定挂在"OpenAI/其他兼容商业API"
+  // 下面（组里最后一项），不管实际选中哪个都不会跟着挪
+  commercialAnthropicLabel.style.display = isCommercial ? "flex" : "none";
+  commercialOpenAILabel.style.display    = isCommercial ? "flex" : "none";
+  anthropicConfigBlock.style.display     = isCommercialAnthropic ? "block" : "none";
+  openaiConfigBlock.style.display        = isCommercialOpenAI ? "block" : "none";
+
+  // 共用字段（自建地址/兼容协议 Key/探测按钮/下拉/模型名）挪进当前实际选中的
+  // 那一个插槽里（Anthropic / OpenAI 兼容 / 自建服务，三选一），保证它们始终
+  // 紧跟在选中的选项下面，不会不管选哪个都固定出现在同一个位置
+  const targetSlot = isCommercialAnthropic ? anthropicSharedSlot
+                    : isCommercialOpenAI   ? openaiSharedSlot
+                    : isSelfHosted         ? selfHostedSharedSlot
+                    : null;
+  if (targetSlot && sharedProviderFields.parentElement !== targetSlot) {
+    targetSlot.appendChild(sharedProviderFields);
+  }
+
+  anthropicApiKeyInput.style.display    = isCommercialAnthropic ? "block" : "none";
+  openaiCompatApiKeyInput.style.display = (isCommercialOpenAI || isSelfHosted) ? "block" : "none";
+  openaiCompatApiKeyInput.placeholder = isCommercialOpenAI
+    ? "API Key（必填）"
+    : "鉴权 Token（大部分自建服务留空即可）";
+
+  llmBaseUrlInput.style.display = (isCommercialOpenAI || isSelfHosted) ? "block" : "none";
+  llmBaseUrlInput.placeholder = isSelfHosted
+    ? "服务地址（必填），比如 http://localhost:11434 或 http://localhost:8000/v1"
+    : "服务地址，默认 https://api.openai.com/v1（Azure OpenAI 等填自己的地址）";
+
+  probeModelsBtn.style.display = showModelPicker ? "inline-block" : "none";
+  llmModelNameInput.style.display = showModelPicker ? "block" : "none";
+  llmModelNameInput.placeholder = isCommercialAnthropic
+    ? "模型名称，比如 claude-sonnet-4-6（可以先点上面「检测可用模型」）"
+    : "模型名称（可以先点上面「检测可用模型」自动获取列表）";
+
+  // 切换到不同的选项之后，之前探测出来的下拉列表不再适用（可能是另一个服务/账号
+  // 的模型），清掉避免看起来还有效
+  modelSelectDropdown.style.display = "none";
+  modelSelectDropdown.innerHTML = "";
+  probeStatus.textContent = "";
+  if (isSelfHosted) selfHostedDetectedProtocol = null;
+
+  providerHint.textContent = isSystem
+    ? (authState.user
+        ? "使用系统托管的 Key，无需自己申请——每月有免费调用次数，用尽后可以切换到自己配置的服务。"
+        : "需要先登录才能使用（右上角登录/注册）；登录后每月有免费调用次数。")
+    : isCommercialAnthropic
+    ? "使用你自己的 Anthropic API Key，不受系统配额限制；也可留空由服务端环境变量 ANTHROPIC_API_KEY 提供。"
+    : isCommercialOpenAI
+    ? "使用 OpenAI 官方、Azure OpenAI 等兼容商业 API 的 Key，不受系统配额限制。"
+    : "填自建服务的地址（Ollama、vLLM、LM Studio 等都可以），点「检测可用模型」自动识别协议和可用模型列表。";
+}
+document.querySelectorAll(
+  'input[name="providerCategory"], input[name="selfConfigMode"], input[name="commercialProvider"], input[name="systemManagedModelMode"]'
+).forEach(el => el.addEventListener("change", updateProviderUI));
+updateProviderUI();
+
+// ── 系统托管的"指定型号"：用系统自己的 Key 探测，不需要用户提供任何凭据，
+// 但要求登录（和 system_managed 本身的登录要求一致），所以带上 authHeaders()
+async function probeSystemManagedModels() {
+  systemManagedModelSelect.innerHTML = "";
+  systemManagedModelStatus.textContent = "探测中…";
+  try {
+    const res = await fetch(`${API_BASE}/api/llm-providers/probe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ mode: "system_managed" }),
+    });
+    const data = await res.json();
+    if (!data.ok) { systemManagedModelStatus.textContent = data.error || "探测失败"; return; }
+    systemManagedModelSelect.innerHTML = data.models
+      .map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("");
+    systemManagedModelStatus.textContent = `检测到 ${data.models.length} 个可用模型`;
+  } catch (e) {
+    systemManagedModelStatus.textContent = "探测失败：" + e.message;
+  }
+}
+
+// ── 检测可用模型：Ollama 走原生 /api/tags，其它服务（自建 vLLM / 商业 OpenAI
+// 兼容 API）走标准 /v1/models——探测前不知道自建服务具体是哪种协议，探测本身
+// 就是在回答这个问题（后端 api/routes/providers.py::probe 做实际探测）。
+probeModelsBtn.addEventListener("click", async () => {
+  const mode = currentSelfConfigMode();
+  const commercialProvider = currentCommercialProvider();
+  modelSelectDropdown.style.display = "none";
+  modelSelectDropdown.innerHTML = "";
+
+  let body;
+  if (mode === "self_hosted") {
+    if (!llmBaseUrlInput.value.trim()) { probeStatus.textContent = "请先填写服务地址"; return; }
+    body = { mode: "self_hosted", base_url: llmBaseUrlInput.value.trim(),
+             api_key: openaiCompatApiKeyInput.value.trim() || null };
+  } else if (commercialProvider === "anthropic") {
+    if (!anthropicApiKeyInput.value.trim()) { probeStatus.textContent = "请先填写 API Key"; return; }
+    body = { mode: "commercial_anthropic", api_key: anthropicApiKeyInput.value.trim() };
+  } else {
+    if (!openaiCompatApiKeyInput.value.trim()) { probeStatus.textContent = "请先填写 API Key"; return; }
+    body = { mode: "commercial_openai", api_key: openaiCompatApiKeyInput.value.trim(),
+             base_url: llmBaseUrlInput.value.trim() || null };
+  }
+
+  probeStatus.textContent = "探测中…";
+  try {
+    const res = await fetch(`${API_BASE}/api/llm-providers/probe`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!data.ok) { probeStatus.textContent = data.error || "探测失败"; return; }
+
+    if (mode === "self_hosted") selfHostedDetectedProtocol = data.detected_protocol;
+    modelSelectDropdown.innerHTML = data.models
+      .map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("");
+    modelSelectDropdown.style.display = "block";
+    if (data.models.length) llmModelNameInput.value = data.models[0];
+    const protocolLabel = data.detected_protocol === "ollama" ? "Ollama" : "OpenAI 兼容";
+    probeStatus.textContent = `检测到 ${data.models.length} 个可用模型`
+      + (mode === "self_hosted" ? `（协议：${protocolLabel}）` : "");
+  } catch (e) {
+    probeStatus.textContent = "探测失败：" + e.message;
+  }
+});
+modelSelectDropdown.addEventListener("change", () => {
+  llmModelNameInput.value = modelSelectDropdown.value;
+});
+
+// ── 聊天气泡 / 阶段分隔线 ─────────────────────────────────────────────
+const STAGE_LABELS = {
+  clarifying_task: "明确任务", preparing_data: "准备数据", choosing_model: "选择训练方式",
+  configuring_training: "配置训练参数", training: "训练中", reporting: "结果播报",
+  multi_agent_start: "Multi-Agent 接管执行",
+};
+
+function appendChatBubble(role, text, attachments) {
+  const el = document.createElement("div");
+  el.className = "chat-bubble " + (role === "user" ? "user" : "assistant");
+  el.textContent = typeof text === "string" ? text : JSON.stringify(text);
+  if (attachments && attachments.length) {
+    const row = document.createElement("div");
+    row.className = "chat-bubble-attachments";
+    attachments.forEach(att => row.appendChild(buildAttachmentChipEl(att, {})));
+    el.appendChild(row);
+  }
+  chatMessages.appendChild(el);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+function appendChatDivider(stage) {
+  const el = document.createElement("div");
+  el.className = "chat-divider";
+  el.textContent = "→ " + (STAGE_LABELS[stage] || stage);
+  chatMessages.appendChild(el);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// 统一处理一条会话消息（快照回放 / 实时推送共用同一份逻辑）
+function processIncomingMessage(m) {
+  switch (m.type) {
+    case "training_event": {
+      hideActionCards(); // 训练一旦开始，之前阶段遗留的操作卡片（比如训练参数卡）不应该再挂着
+      if (emptyState.style.display !== "none") {
+        emptyState.style.display = "none";
+        resultsArea.style.display = "block";
+      }
+      state = reduceEvent(state, m.payload);
+      render(state);
+      appendLog(m.payload);
+      trainingActive = !(m.payload.type === "finished" || m.payload.type === "error");
+      break;
+    }
+    case "question": {
+      appendChatBubble("assistant", m.payload);
+      if (m.ui_hint === "dataset_recommendation" && m.data) renderRecommendationCandidates(m.data);
+      if (m.ui_hint) showActionCard(m.ui_hint); else hideActionCards();
+      break;
+    }
+    case "stage_changed": {
+      appendChatDivider(m.payload);
+      hideActionCards();
+      break;
+    }
+    case "agent_event": {
+      // Multi-Agent 模式专用——完全走独立的 renderAgentEvent()，不碰 reduceEvent/state，
+      // 保证 web/app.js 的 28 个测试不受影响
+      renderAgentEvent(m.payload, m.data);
+      break;
+    }
+    case "text":
+    default: {
+      appendChatBubble(m.role === "user" ? "user" : "assistant", m.payload, m.data && m.data.attachments);
+      if (m.data && m.data.attachments) recordSeenAttachments(m.data.attachments);
+      break;
+    }
+  }
+}
+
+// ── 会话生命周期：懒创建 + WebSocket ──────────────────────────────────
+async function ensureConversation(labelHint) {
+  if (conversationId) return conversationId;
+  const provider = currentProvider();
+  const isSelfHostedMode = currentCategory() === "self_configured" && currentSelfConfigMode() === "self_hosted";
+  const isCommercialMode = currentCategory() === "self_configured" && currentSelfConfigMode() === "commercial";
+
+  if (provider === "openai_compatible") {
+    if (isSelfHostedMode && !llmBaseUrlInput.value.trim()) {
+      throw new Error("自建服务需要先填写服务地址");
+    }
+    if (isCommercialMode && !openaiCompatApiKeyInput.value.trim()) {
+      throw new Error("商业 API 需要先填写 API Key");
+    }
+    if (!llmModelNameInput.value.trim()) {
+      throw new Error("需要先填写模型名称，或者点「检测可用模型」自动获取");
+    }
+  }
+  if (provider === "system_managed" && !authState.user) {
+    throw new Error("系统托管的商业 API 需要先登录（右上角登录/注册）");
+  }
+
+  const isAnthropic    = provider === "anthropic";
+  const isOpenAICompat = provider === "openai_compatible";
+  const isSystemSpecific = provider === "system_managed" && currentSystemManagedModelMode() === "specific";
+  // 商业 OpenAI 兼容 API 留空地址时，默认指向 OpenAI 官方——只有这一种情况有
+  // 通用默认值可以兜底；自建服务地址因人而异，前面已经强制要求填写
+  const effectiveBaseUrl = isOpenAICompat
+    ? (llmBaseUrlInput.value.trim() || (isCommercialMode ? "https://api.openai.com/v1" : ""))
+    : "";
+
+  const res = await fetch(`${API_BASE}/api/conversations`, {
+    method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      llm_provider: provider,
+      // 系统托管：自动模式发 null（后端用默认型号），指定模式发用户在
+      // systemManagedModelSelect 里选的型号；商业 Anthropic/OpenAI 兼容/自建
+      // 服务都从 llmModelNameInput 读（探测下拉选中后会同步写进这个输入框）——
+      // 之前这里把 Anthropic 商业模式也强制发 null，导致用户在下拉里选的具体
+      // 型号被悄悄丢弃，明明界面上让选、实际从来没生效过，一并修掉
+      llm_model: provider === "system_managed"
+        ? (isSystemSpecific ? (systemManagedModelSelect.value || null) : null)
+        : (llmModelNameInput.value.trim() || null),
+      // 各选项的鉴权字段完全独立：Anthropic 只读 anthropicApiKeyInput，
+      // OpenAI 兼容协议（不管自建还是商业）只读 openaiCompatApiKeyInput，
+      // 不存在共用同一个值、串到别的选项里发出去的可能
+      api_key: isAnthropic ? (anthropicApiKeyInput.value.trim() || null)
+             : isOpenAICompat ? (openaiCompatApiKeyInput.value.trim() || null)
+             : null,
+      llm_base_url: (isAnthropic || provider === "system_managed") ? null : (effectiveBaseUrl || null),
+      orchestration_mode: orchestrationMode,
+      // 数组即使为空也是"真值"（[] || null 结果还是 []，不是 null）——
+      // 显式判断长度，不填 MCP 地址/不勾选任何 Skill 时要发 null，不是空数组
+      mcp_server_urls: (() => {
+        if (orchestrationMode !== "multi_agent") return null;
+        const urls = mcpServerUrlsInput.value.split("\n").map(s => s.trim()).filter(Boolean);
+        return urls.length ? urls : null;
+      })(),
+      enabled_skills: (() => {
+        if (orchestrationMode !== "multi_agent") return null;
+        const skills = Array.from(document.querySelectorAll('input[name="agentSkill"]:checked')).map(el => el.value);
+        return skills.length ? skills : null;
+      })(),
+    }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  conversationId = data.conversation_id;
+  currentSessionOrigin = "web";   // 浏览器自己发起的会话，永远是 "web"
+  updateChatInputForOrigin();
+  connectConversationWs(conversationId);
+  addSession({ conversationId, label: (labelHint || "").slice(0, 40), createdAt: Date.now(), origin: "web" });
+  return conversationId;
+}
+
+// API 会话在网页上只读查看（真正推进只能通过 API）——聊天输入框据此禁用/启用，
+// 跟 trainingActive 那种"训练中不能改配置"的禁用是两回事，这个是"这个会话
+// 本身就不归网页管"，不会随训练完成而自动恢复
+function updateChatInputForOrigin() {
+  const isApiSession = currentSessionOrigin === "api";
+  chatInput.disabled = isApiSession;
+  chatSendBtn.disabled = isApiSession;
+  $("chatAttachBtn").disabled = isApiSession;
+  chatInput.placeholder = isApiSession
+    ? "此会话通过 API 发起，请通过 API 继续推进"
+    : "说点什么…（比如任务描述，或者回复上面的问题）";
+}
+
+// 清空当前对话在页面上的一切残留展示，回到"还没打开任何对话"的样子——
+// WS snapshot 帧到达时用，删除当前正打开的会话时也要用同一套重置逻辑
+// （删除之后没有 WS 会再推 snapshot 帧来帮你清空），所以抽成公用函数。
+function resetConversationView() {
+  chatMessages.innerHTML = "";
+  logLines.innerHTML = "";
+  state = initialState();
+  trainingActive = false;
+  emptyState.style.display = "flex";
+  resultsArea.style.display = "none";
+  hideActionCards();
+  // Plan 面板/活动流是重放消息时增量 append 的，不重置的话切换/重载会话会
+  // 把上一次的残留内容和这次重放的内容拼在一起显示两份
+  agentPlanState = { steps: [], currentStepIndex: null };
+  agentPlanCard.style.display = "none";
+  agentPlanSteps.innerHTML = "";
+  agentActivityFeed.innerHTML = "";
+  $("agentResourceBar").style.display = "none";   // 资源统计栏同理，不能带着上一个会话的数字
+  // "添加文件"下拉菜单里"本次对话中的文件"那一节是跟着当前会话走的——
+  // 切换/重载会话时清空，不然会把上一个会话看到过的附件也列进来
+  conversationSeenAttachments = [];
+}
+
+function connectConversationWs(id) {
+  const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+  const wsHost = API_BASE ? API_BASE.replace(/^https?:/, wsProtocol) : `${wsProtocol}//${location.host}`;
+  const wsUrl = `${wsHost}/api/conversations/${id}/stream`;
+
+  ws = new WebSocket(wsUrl);
+  ws.onmessage = (ev) => {
+    let frame;
+    try { frame = JSON.parse(ev.data); } catch { return; }
+    if (frame.frame === "snapshot") {
+      resetConversationView();
+      frame.messages.forEach(processIncomingMessage);
+    } else if (frame.frame === "message") {
+      processIncomingMessage(frame.message);
+    }
+    // heartbeat：不需要处理
+  };
+  ws.onerror = () => appendLog({ type: "ws_error", message: "WebSocket 连接异常" });
+  ws.onclose = (ev) => {
+    if (ev.code === 1008) { alert("会话不存在或记录已过期（后端重启会清空内存会话）"); return; }
+    // 连接可能因为网络抖动/中间代理空闲断开而悄悄掉线（不是用户主动切走会话）——
+    // 训练可能还要跑好几分钟，掉线之后如果不自动重连，页面会停在最后一次收到
+    // 消息的样子、看起来像"训练卡住了"，实际后端还在正常跑。只要用户没有切换
+    // 到别的会话（conversationId 没变），就自动重连；重连后端会重新推一条完整
+    // 的 snapshot 帧，靠这个自动补上断线期间错过的全部事件，不需要额外的
+    // "从哪条消息开始补"逻辑。
+    if (id === conversationId) {
+      setTimeout(() => { if (id === conversationId) connectConversationWs(id); }, 2000);
+    }
+  };
+}
+
+async function sendToConversation(kind, payload, labelHint, attachments) {
+  try {
+    const id = await ensureConversation(labelHint);
+    const body = kind === "text"
+      ? { kind: "text", text: payload, ...(attachments && attachments.length ? { attachments } : {}) }
+      : { kind: "structured", structured: payload };
+    const res = await fetch(`${API_BASE}/api/conversations/${id}/messages`, {
+      method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(apiErrorMessage(err, res));
+    }
+    // 新增消息完全靠 WS 推送渲染（见 connectConversationWs），这里不重复处理 REST 响应体，
+    // 避免同一条消息被渲染两次
+  } catch (e) {
+    alert("发送失败：" + e.message);
+  }
+}
+
+// ── 聊天输入框附件（"添加文件"图标 + 粘贴长文本自动转附件）────────────────────
+// 附件分两条完全不同的路径：
+//  1. 图片分类/VLM 数据卡片正显示的时候（ui_hint 是 image_picker/vlm_picker），
+//     附加的 jpg/jpeg/png 直接并入那张卡片已有的训练样本流程（复用现成的
+//     uploadImageFiles + pendingImageExamples/pendingVlmExamples + 现成的提交按钮），
+//     不当成聊天附件——因为这种场景下这些图片本来就是要标注成训练样本的。
+//  2. 其它任何时候（包括 svg/eps，这两种格式本来就不适合当训练样本）：走这里的
+//     通用附件路径——上传到 /api/attachments，文档拿到 extracted_text 之后随下一条
+//     消息发给后端（喂给 LLM），图片只挂一个可预览的 url，纯粹给人看的参考附件。
+const PASTE_ATTACHMENT_THRESHOLD = 400;   // 粘贴超过这个字数就转成附件而不是塞满输入框
+let pendingChatAttachments = [];   // [{id, filename, kind, extracted_text?, url?, previewUrl?, size_bytes, uploading, error}]
+
+// "添加文件"下拉菜单里"本次对话中的文件"这一节——每条消息的 data.attachments
+// 里出现过的附件都记一份（按 filename 去重，后出现的覆盖前面的，比如同名文件
+// 后来又提取到了内容），这样用户想再引用一次之前发过的文件时不用重新从磁盘选择。
+// 只在内存里存这一份，不持久化——这本来就是"当前这次对话看到过什么"，
+// 刷新页面/切换会话后 resetConversationView() 会清空重来。
+let conversationSeenAttachments = [];
+function recordSeenAttachments(attachments) {
+  attachments.forEach(att => {
+    const idx = conversationSeenAttachments.findIndex(a => a.filename === att.filename);
+    if (idx >= 0) conversationSeenAttachments[idx] = att; else conversationSeenAttachments.push(att);
+  });
+}
+
+function attachmentIconSvg() {
+  return `<svg class="attachment-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5h4.5L8 5.5H14v7H2z"></path></svg>`;
+}
+
+function buildAttachmentChipEl(att, { removable } = {}) {
+  const el = document.createElement("div");
+  el.className = "attachment-chip" + (att.uploading ? " uploading" : "") + (att.error ? " errored" : "");
+  const isEps = /\.eps$/i.test(att.filename || "");
+  const previewSrc = att.kind === "image" && !isEps ? (att.url || att.previewUrl) : null;
+  const titleParts = [att.filename];
+  if (att.error) titleParts.push(att.error);
+  el.title = titleParts.join(" — ");
+  el.innerHTML =
+    (previewSrc ? `<img class="attachment-thumb" src="${previewSrc}">` : attachmentIconSvg()) +
+    `<span class="attachment-name">${escapeHtml(att.uploading ? "上传中…" + att.filename : att.filename)}</span>` +
+    (removable ? `<button type="button" class="attachment-remove" title="移除">×</button>` : "");
+  if (removable) {
+    el.querySelector(".attachment-remove").addEventListener("click", () => {
+      pendingChatAttachments = pendingChatAttachments.filter(a => a.id !== att.id);
+      renderPendingAttachments();
+    });
+  }
+  return el;
+}
+
+function renderPendingAttachments() {
+  const row = $("pendingAttachmentsRow");
+  row.innerHTML = "";
+  row.style.display = pendingChatAttachments.length ? "flex" : "none";
+  pendingChatAttachments.forEach(att => row.appendChild(buildAttachmentChipEl(att, { removable: true })));
+}
+
+// 判断现在是不是正显示着图片分类/VLM 那张"训练样本"卡片——是的话 jpg/jpeg/png
+// 应该走那张卡片已有的标注流程，不是当聊天附件
+function activeImageSampleCard() {
+  if (ACTION_CARDS.image_picker.style.display !== "none") return "image_picker";
+  if (ACTION_CARDS.vlm_picker.style.display !== "none") return "vlm_picker";
+  return null;
+}
+
+async function uploadChatAttachment(file) {
+  const id = "att-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+  const kindGuess = /\.(jpe?g|png|svg|eps)$/i.test(file.name) ? "image" : "document";
+  const pending = {
+    id, filename: file.name, kind: kindGuess, size_bytes: file.size,
+    previewUrl: kindGuess === "image" ? URL.createObjectURL(file) : null,
+    uploading: true, error: null,
+  };
+  pendingChatAttachments.push(pending);
+  renderPendingAttachments();
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${API_BASE}/api/attachments`, { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    Object.assign(pending, {
+      kind: data.kind, extracted_text: data.extracted_text, url: data.url,
+      error: data.extraction_error || null, uploading: false,
+    });
+  } catch (e) {
+    pending.uploading = false;
+    pending.error = "上传失败：" + e.message;
+  }
+  renderPendingAttachments();
+}
+
+// 压缩包（zip/7z/tar 系列/单文件 gz-bz2/rar）——一次可以选中多个压缩包一起传，
+// 后端（POST /api/attachments/archive）在同一个请求里安全解压每一个、按总大小
+// 限额拒绝过大的请求；这里先放一个"解压中…"的占位 chip，解压完再展开成
+// 一个个具体文件的 chip（每个文件此后跟直接上传是同一种展示/发送方式，
+// 不区分"这是从压缩包里来的"）。
+const ARCHIVE_SUFFIX_PATTERN = /\.(zip|7z|tar|tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz|txz|gz|bz2|rar)$/i;
+function isArchiveFile(filename) {
+  return ARCHIVE_SUFFIX_PATTERN.test(filename || "");
+}
+
+async function uploadChatArchives(archiveFiles) {
+  const placeholderIds = archiveFiles.map(f => {
+    const id = "archive-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+    pendingChatAttachments.push({
+      id, filename: f.name, kind: "document", size_bytes: f.size,
+      uploading: true, error: null, isArchivePlaceholder: true,
+    });
+    return id;
+  });
+  renderPendingAttachments();
+  try {
+    const form = new FormData();
+    archiveFiles.forEach(f => form.append("files", f));
+    const res = await fetch(`${API_BASE}/api/attachments/archive`, { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    pendingChatAttachments = pendingChatAttachments.filter(a => !placeholderIds.includes(a.id));
+    data.items.forEach(item => {
+      pendingChatAttachments.push({
+        id: "att-" + Date.now() + "-" + Math.random().toString(36).slice(2),
+        filename: item.filename, kind: item.kind, size_bytes: item.size_bytes,
+        extracted_text: item.extracted_text, url: item.url,
+        error: item.extraction_error || null, uploading: false,
+      });
+    });
+    if (data.skipped && data.skipped.length) {
+      alert(`压缩包解压完成，但有 ${data.skipped.length} 个文件被跳过：\n` +
+            data.skipped.slice(0, 8).map(s => `[${s.archive}] ${s.filename}：${s.reason}`).join("\n") +
+            (data.skipped.length > 8 ? `\n…（还有 ${data.skipped.length - 8} 条）` : ""));
+    }
+  } catch (e) {
+    pendingChatAttachments = pendingChatAttachments.filter(a => !placeholderIds.includes(a.id));
+    alert("压缩包上传失败：" + e.message);
+  }
+  renderPendingAttachments();
+}
+
+// 添加文件图标 / 拖拽 共用同一套逐文件路由逻辑：图片分类/VLM 卡片正显示时，
+// jpg/jpeg/png 并入那张卡片已有的训练样本流程；压缩包统一批量走上面的
+// uploadChatArchives；其它一切走通用附件上传。
+async function handleIncomingFiles(files) {
+  if (!files.length) return;
+  const activeCard = activeImageSampleCard();
+  const archiveFiles = files.filter(f => isArchiveFile(f.name));
+  const otherFiles = files.filter(f => !isArchiveFile(f.name));
+
+  if (archiveFiles.length) await uploadChatArchives(archiveFiles);
+
+  for (const file of otherFiles) {
+    const isRasterImage = /\.(jpe?g|png)$/i.test(file.name);
+    if (activeCard && isRasterImage) {
+      // 直接并入现成的图片训练样本卡片，复用它已有的上传+标注+提交逻辑，
+      // 不新建一套平行机制
+      try {
+        if (activeCard === "image_picker") {
+          const uploaded = await uploadImageFiles([file], $("imageUploadStatus"));
+          pendingImageExamples.push(...uploaded.map(u => ({ ...u, label: "" })));
+          renderImageThumbGrid();
+        } else {
+          const uploaded = await uploadImageFiles([file], $("vlmUploadStatus"));
+          pendingVlmExamples.push(...uploaded.map(u => ({ ...u, prompt: "", reference_answer: "" })));
+          renderVlmThumbGrid();
+        }
+      } catch (e) {
+        alert("上传失败：" + e.message);
+      }
+    } else {
+      await uploadChatAttachment(file);
+    }
+  }
+}
+
+// "添加文件"下拉菜单——点图标不再直接弹原生文件选择框，而是先展开一个小菜单，
+// 三选一：本地上传 / 复用本次对话已经出现过的附件 / 引用一个历史会话的内容。
+// 跟头像下拉菜单（avatarDropdown）同一套交互写法：点开关切换 + 点菜单外任意
+// 位置关闭 + 阻止菜单内部点击冒泡出去把自己关掉。
+const chatAttachMenu = $("chatAttachMenu");
+$("chatAttachBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const willOpen = chatAttachMenu.style.display !== "block";
+  if (willOpen) {
+    renderChatAttachConvList();
+    renderChatAttachHistoryList();
+  }
+  chatAttachMenu.style.display = willOpen ? "block" : "none";
+});
+chatAttachMenu.addEventListener("click", (e) => e.stopPropagation());
+document.addEventListener("click", () => { chatAttachMenu.style.display = "none"; });
+$("chatAttachUploadItem").addEventListener("click", () => {
+  chatAttachMenu.style.display = "none";
+  $("chatAttachInput").click();
+});
+
+function renderChatAttachConvList() {
+  const section = $("chatAttachConvSection");
+  const list = $("chatAttachConvList");
+  list.innerHTML = "";
+  if (!conversationSeenAttachments.length) { section.style.display = "none"; return; }
+  section.style.display = "block";
+  conversationSeenAttachments.forEach(att => {
+    const isEps = /\.eps$/i.test(att.filename || "");
+    const previewSrc = att.kind === "image" && !isEps ? att.url : null;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chat-attach-menu-item";
+    btn.title = att.filename;
+    btn.innerHTML =
+      (previewSrc ? `<img class="attachment-thumb" src="${previewSrc}">` : attachmentIconSvg()) +
+      `<span class="attachment-name">${escapeHtml(att.filename)}</span>`;
+    btn.addEventListener("click", () => {
+      // 已经在服务器上了（文档早就提取过 extracted_text，图片早就有 url），
+      // 这里只是把它重新加回待发送列表，不用再上传一遍
+      pendingChatAttachments.push({
+        id: "reuse-" + Date.now() + "-" + Math.random().toString(36).slice(2),
+        filename: att.filename, kind: att.kind, extracted_text: att.extracted_text,
+        url: att.url, previewUrl: att.url, size_bytes: att.size_bytes || 0,
+        uploading: false, error: null,
+      });
+      renderPendingAttachments();
+      chatAttachMenu.style.display = "none";
+    });
+    list.appendChild(btn);
+  });
+}
+
+function renderChatAttachHistoryList() {
+  const list = $("chatAttachHistoryList");
+  list.innerHTML = "";
+  // 排除当前正打开的这个会话本身——引用自己没有意义
+  const sessions = loadSessions().filter(s => s.conversationId !== conversationId).slice(0, 30);
+  if (!sessions.length) {
+    list.innerHTML = `<div class="chat-attach-menu-empty">还没有其它历史会话</div>`;
+    return;
+  }
+  sessions.forEach(s => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chat-attach-menu-item";
+    btn.title = s.conversationId;
+    btn.innerHTML = `<span class="attachment-name">${escapeHtml(s.label || s.conversationId)}</span>`;
+    btn.addEventListener("click", () => attachHistoricalConversation(s));
+    list.appendChild(btn);
+  });
+}
+
+// 把某个历史会话的对话内容（不含训练事件的原始技术细节，只留播报性质的一句话
+// 结果）拼成一段文本，当成一个"文档"附件——跟直接上传一份文档走的是同一条后续
+// 路径（effective_text 拼接进下一条消息），只是这段文本的来源是"读取另一个
+// 会话的历史记录"而不是"解析一个上传的文件"。
+const MAX_HISTORY_CONV_CHARS = 20000;
+async function attachHistoricalConversation(sessionEntry) {
+  chatAttachMenu.style.display = "none";
+  const placeholderId = "histconv-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+  const label = sessionEntry.label || sessionEntry.conversationId;
+  pendingChatAttachments.push({
+    id: placeholderId, filename: `历史会话：${label}`, kind: "document",
+    size_bytes: 0, uploading: true, error: null,
+  });
+  renderPendingAttachments();
+  try {
+    const res = await fetch(`${API_BASE}/api/conversations/${sessionEntry.conversationId}/messages`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const msgs = await res.json();
+    const lines = [];
+    for (const m of msgs) {
+      if (m.type === "text" || m.type === "question") {
+        const text = typeof m.payload === "string" ? m.payload : JSON.stringify(m.payload);
+        lines.push(`[${m.role === "user" ? "用户" : "助手"}] ${text}`);
+      } else if (m.type === "training_event" && m.payload &&
+                 (m.payload.type === "finished" || m.payload.type === "error")) {
+        lines.push(m.payload.type === "finished"
+          ? `[训练结果] 完成，最佳 ${m.payload.metric_name} = ${m.payload.best_metric}`
+          : `[训练结果] 失败：${m.payload.message || "未知错误"}`);
+      }
+    }
+    let text = lines.join("\n") || "（这个历史会话里没有可提取的文字内容）";
+    if (text.length > MAX_HISTORY_CONV_CHARS) {
+      text = text.slice(0, MAX_HISTORY_CONV_CHARS) + `\n…（内容过长，已截断，原文共 ${text.length} 字）`;
+    }
+    const item = pendingChatAttachments.find(a => a.id === placeholderId);
+    if (item) Object.assign(item, { extracted_text: text, size_bytes: new Blob([text]).size, uploading: false });
+  } catch (e) {
+    const item = pendingChatAttachments.find(a => a.id === placeholderId);
+    if (item) { item.uploading = false; item.error = "读取失败：" + e.message; }
+  }
+  renderPendingAttachments();
+}
+$("chatAttachInput").addEventListener("change", async () => {
+  const files = Array.from($("chatAttachInput").files);
+  $("chatAttachInput").value = "";
+  await handleIncomingFiles(files);
+});
+
+// 拖拽文件/图片到输入框区域——跟点"添加文件"图标选中的文件走完全同一套
+// handleIncomingFiles 路由逻辑，不重复实现一遍
+const chatDropZone = document.querySelector(".chat-input-wrap");
+let chatDropDepth = 0;   // dragenter/dragleave 会因为子元素冒泡而配对不齐，用计数代替布尔值
+chatDropZone.addEventListener("dragenter", (e) => {
+  e.preventDefault();
+  chatDropDepth++;
+  chatDropZone.classList.add("drag-over");
+});
+chatDropZone.addEventListener("dragover", (e) => e.preventDefault());
+chatDropZone.addEventListener("dragleave", (e) => {
+  e.preventDefault();
+  chatDropDepth = Math.max(0, chatDropDepth - 1);
+  if (chatDropDepth === 0) chatDropZone.classList.remove("drag-over");
+});
+chatDropZone.addEventListener("drop", async (e) => {
+  e.preventDefault();
+  chatDropDepth = 0;
+  chatDropZone.classList.remove("drag-over");
+  if (chatInput.disabled) return;   // API 会话只读，拖文件进来也不该生效
+  const files = Array.from(e.dataTransfer ? e.dataTransfer.files : []);
+  await handleIncomingFiles(files);
+});
+
+// 粘贴长文本——不是想插一大段进输入框把界面挤爆，而是转成一个"文本附件"，
+// 跟上传文档走同一套显示逻辑（预览用文件名，真正内容随消息一起发给后端）
+chatInput.addEventListener("paste", (e) => {
+  const clipboard = e.clipboardData || window.clipboardData;
+  if (!clipboard) return;
+  const text = clipboard.getData("text/plain");
+  if (!text || text.length <= PASTE_ATTACHMENT_THRESHOLD) return;   // 短文本走浏览器默认粘贴行为
+  e.preventDefault();
+  pendingChatAttachments.push({
+    id: "paste-" + Date.now() + "-" + Math.random().toString(36).slice(2),
+    filename: `粘贴的文本（${text.length} 字）.txt`, kind: "document",
+    extracted_text: text, size_bytes: new Blob([text]).size, uploading: false, error: null,
+  });
+  renderPendingAttachments();
+});
+
+chatSendBtn.addEventListener("click", async () => {
+  const text = chatInput.value.trim();
+  if (!text && !pendingChatAttachments.length) return;
+  if (trainingActive) { alert("训练正在进行中，暂时不能发送新的配置消息，等这一轮跑完再说吧。"); return; }
+  if (pendingChatAttachments.some(a => a.uploading)) { alert("还有附件正在上传，请稍候再发送。"); return; }
+  const attachmentsPayload = pendingChatAttachments.map(a => ({
+    filename: a.filename, kind: a.kind, extracted_text: a.extracted_text || null, url: a.url || null,
+  }));
+  chatInput.value = "";
+  pendingChatAttachments = [];
+  renderPendingAttachments();
+  chatSendBtn.disabled = true;
+  try {
+    await sendToConversation("text", text, text || "（附件）", attachmentsPayload);
+  } finally {
+    chatSendBtn.disabled = false;
+  }
+});
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); chatSendBtn.click(); }
+});
+
+// ── 数据来源（手动粘贴 / 本地上传 / 本地路径 / HF 搜索 / 魔搭搜索）──────────────
+let dataSourceMode = "manual";
+let pendingPreview = null;       // { platform, ref, split, config }
+let selectedDatasetRef = null;   // 拉取成功后拿到的 dataset_ref，提交时替代 examples
+let selectedDatasetInfo = null;  // { n_examples, labels }
+
+const datasetPreviewCard = $("datasetPreviewCard");
+const previewSampleRows  = $("previewSampleRows");
+const textColSelect      = $("textColSelect");
+const labelColSelect     = $("labelColSelect");
+const datasetUseStatus   = $("datasetUseStatus");
+
+document.querySelectorAll(".source-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".source-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    dataSourceMode = tab.dataset.source;
+    document.querySelectorAll(".source-panel").forEach(p => p.style.display = "none");
+    $(`sourcePanel-${dataSourceMode}`).style.display = "block";
+  });
+});
+
+function renderPreviewTable(columns, rows) {
+  if (!rows.length) return "<div>（无样本可预览）</div>";
+  const head = columns.map(c => `<th>${escapeHtml(c)}</th>`).join("");
+  const body = rows.slice(0, 10).map(r =>
+    `<tr>${columns.map(c => `<td>${escapeHtml(String(r[c] ?? ""))}</td>`).join("")}</tr>`
+  ).join("");
+  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+async function doPreview(platform, ref, extra = {}) {
+  datasetUseStatus.textContent = "";
+  try {
+    const res = await fetch(`${API_BASE}/api/datasets/preview`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ platform, ref, ...extra }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+
+    pendingPreview = { platform, ref, ...extra };
+    previewSampleRows.innerHTML = renderPreviewTable(data.columns, data.sample_rows);
+    textColSelect.innerHTML = data.columns.map(c =>
+      `<option value="${escapeHtml(c)}" ${c === data.suggested_text_col ? "selected" : ""}>${escapeHtml(c)}</option>`).join("");
+    labelColSelect.innerHTML = data.columns.map(c =>
+      `<option value="${escapeHtml(c)}" ${c === data.suggested_label_col ? "selected" : ""}>${escapeHtml(c)}</option>`).join("");
+    datasetPreviewCard.style.display = "block";
+    datasetPreviewCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) {
+    alert("预览失败：" + e.message);
+  }
+}
+
+$("useDatasetBtn").addEventListener("click", async () => {
+  if (!pendingPreview) return;
+  const text_col = textColSelect.value, label_col = labelColSelect.value;
+  if (!text_col || !label_col || text_col === label_col) {
+    alert("请分别选择不同的文本列和标签列");
+    return;
+  }
+  datasetUseStatus.textContent = "拉取中…";
+  try {
+    const res = await fetch(`${API_BASE}/api/datasets/fetch`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...pendingPreview, text_col, label_col, max_samples: 500 }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    selectedDatasetRef = data.dataset_ref;
+    selectedDatasetInfo = { n_examples: data.n_examples, labels: data.labels };
+    datasetUseStatus.textContent = `已导入 ${data.n_examples} 条样本，${data.labels.length} 个标签：${data.labels.join("、")}`;
+    datasetPreviewCard.style.display = "none";
+    await sendToConversation("structured", { type: "data_selected", dataset_ref: selectedDatasetRef });
+  } catch (e) {
+    datasetUseStatus.textContent = "";
+    alert("导入失败：" + e.message);
+  }
+});
+
+// ── 自动数据集推荐卡片：candidates 里已经带着预览数据（后端已经调过 preview()），
+// 直接渲染，不用再打一次 /api/datasets/preview；"用这个"复用和手动搜索完全一样的
+// /api/datasets/fetch → sendToConversation(data_selected) 流程 ──────────────────
+const recommendationCandidatesEl = $("recommendationCandidates");
+
+function renderRecommendationCandidates(data) {
+  const candidates = data.candidates || [];
+  recommendationCandidatesEl.innerHTML = candidates.map((c, i) => `
+    <div class="dataset-preview-card recommendation-candidate" style="display:block; margin-bottom:12px">
+      <div class="card-label">${escapeHtml(c.ref)}</div>
+      <div class="field-hint">${escapeHtml(c.rationale || "")}</div>
+      ${renderPreviewTable(c.columns, c.sample_rows)}
+      <div class="row2">
+        <div class="field">
+          <label class="field-label">文本列</label>
+          <select data-idx="${i}" class="rec-text-col">${c.columns.map(col =>
+            `<option value="${escapeHtml(col)}" ${col === c.suggested_text_col ? "selected" : ""}>${escapeHtml(col)}</option>`).join("")}</select>
+        </div>
+        <div class="field">
+          <label class="field-label">标签列</label>
+          <select data-idx="${i}" class="rec-label-col">${c.columns.map(col =>
+            `<option value="${escapeHtml(col)}" ${col === c.suggested_label_col ? "selected" : ""}>${escapeHtml(col)}</option>`).join("")}</select>
+        </div>
+      </div>
+      <button type="button" class="btn rec-use-btn" data-idx="${i}" style="margin-top:8px">用这个数据集</button>
+      <div class="field-hint rec-use-status" data-idx="${i}"></div>
+    </div>
+  `).join("");
+
+  recommendationCandidatesEl.querySelectorAll(".rec-use-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      const candidate = candidates[idx];
+      const textCol = recommendationCandidatesEl.querySelector(`.rec-text-col[data-idx="${idx}"]`).value;
+      const labelCol = recommendationCandidatesEl.querySelector(`.rec-label-col[data-idx="${idx}"]`).value;
+      const statusEl = recommendationCandidatesEl.querySelector(`.rec-use-status[data-idx="${idx}"]`);
+      if (!textCol || !labelCol || textCol === labelCol) {
+        alert("请分别选择不同的文本列和标签列");
+        return;
+      }
+      statusEl.textContent = "拉取中…";
+      try {
+        const res = await fetch(`${API_BASE}/api/datasets/fetch`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            platform: candidate.platform, ref: candidate.ref,
+            text_col: textCol, label_col: labelCol, max_samples: 500,
+          }),
+        });
+        const resData = await res.json();
+        if (!res.ok) throw new Error(apiErrorMessage(resData, res));
+        statusEl.textContent = `已导入 ${resData.n_examples} 条样本，${resData.labels.length} 个标签：${resData.labels.join("、")}`;
+        hideActionCards();
+        await sendToConversation("structured", { type: "data_selected", dataset_ref: resData.dataset_ref });
+      } catch (e) {
+        statusEl.textContent = "";
+        alert("导入失败：" + e.message);
+      }
+    });
+  });
+}
+
+$("recommendationPickManualBtn").addEventListener("click", () => {
+  showActionCard("data_picker");
+});
+
+// 手动粘贴样本 → 直接作为结构化消息发出
+$("useManualBtn").addEventListener("click", async () => {
+  const { examples } = updateExampleCount();
+  if (examples.length < 5) { alert("至少需要 5 条训练样本"); return; }
+  await sendToConversation("structured", { type: "data_selected", examples });
+});
+
+// 训练后端选择
+$("backendConfirmBtn").addEventListener("click", async () => {
+  const model_backend = document.querySelector('input[name="modelBackendChat"]:checked').value;
+  await sendToConversation("structured", { type: "backend_selected", model_backend });
+});
+
+// 训练参数配置
+$("trainingConfigConfirmBtn").addEventListener("click", async () => {
+  const max_iterations = parseInt($("chatMaxIterations").value, 10) || 3;
+  const target_metric = parseFloat($("chatTargetMetric").value) || 0.80;
+  await sendToConversation("structured", { type: "training_config", max_iterations, target_metric });
+});
+$("trainingConfigDefaultBtn").addEventListener("click", async () => {
+  await sendToConversation("structured", { type: "training_config" });
+});
+
+// 本地上传
+$("uploadBtn").addEventListener("click", async () => {
+  const fileInput = $("uploadFileInput");
+  const file = fileInput.files[0];
+  if (!file) { alert("请先选择文件"); return; }
+  $("uploadStatus").textContent = "上传中…";
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${API_BASE}/api/datasets/upload`, { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    $("uploadStatus").textContent = `已上传 ${data.filename}（${(data.size_bytes/1024).toFixed(1)} KB）`;
+    await doPreview("local_upload", data.ref);
+  } catch (e) {
+    $("uploadStatus").textContent = "";
+    alert("上传失败：" + e.message);
+  }
+});
+
+// 本地路径
+$("localPathBtn").addEventListener("click", async () => {
+  const path = $("localPathInput").value.trim();
+  if (!path) { alert("请输入本地文件路径"); return; }
+  $("localPathStatus").textContent = "加载中…";
+  await doPreview("local_path", path);
+  $("localPathStatus").textContent = "";
+});
+
+// 图片批量上传（VLM Phase 3/4 共用）：直接返回 ref，本地缩略图用 URL.createObjectURL 就地生成，不用等服务器
+async function uploadImageFiles(fileList, statusEl) {
+  const files = Array.from(fileList);
+  if (!files.length) return [];
+  statusEl.textContent = `上传中…（${files.length} 张）`;
+  const form = new FormData();
+  files.forEach(f => form.append("files", f));
+  const res = await fetch(`${API_BASE}/api/datasets/upload-images`, { method: "POST", body: form });
+  const data = await res.json();
+  if (!res.ok) throw new Error(apiErrorMessage(data, res));
+  statusEl.textContent = `已上传 ${data.images.length} 张（共 ${files.length} 张选中）`;
+  return data.images.map((img, i) => ({ ref: img.ref, previewUrl: URL.createObjectURL(files[i]) }));
+}
+
+// 图片分类数据卡片（IMAGE_CLASSIFICATION）
+let pendingImageExamples = [];   // [{ref, previewUrl, label}]
+
+function renderImageThumbGrid() {
+  const grid = $("imageThumbGrid");
+  grid.innerHTML = "";
+  pendingImageExamples.forEach((item, i) => {
+    const div = document.createElement("div");
+    div.className = "image-thumb-item";
+    div.innerHTML = `
+      <img src="${item.previewUrl}">
+      <input type="text" placeholder="标签" class="image-label-input" value="${escapeHtml(item.label || "")}">
+    `;
+    div.querySelector(".image-label-input").addEventListener("input", (e) => {
+      pendingImageExamples[i].label = e.target.value;
+    });
+    grid.appendChild(div);
+  });
+}
+
+$("imageFilesBtn").addEventListener("click", () => $("imageFilesInput").click());
+$("imageFilesInput").addEventListener("change", async () => {
+  try {
+    const uploaded = await uploadImageFiles($("imageFilesInput").files, $("imageUploadStatus"));
+    pendingImageExamples.push(...uploaded.map(u => ({ ...u, label: "" })));
+    renderImageThumbGrid();
+  } catch (e) {
+    $("imageUploadStatus").textContent = "";
+    alert("上传失败：" + e.message);
+  }
+  $("imageFilesInput").value = "";
+});
+$("imageExamplesSubmitBtn").addEventListener("click", async () => {
+  const image_examples = pendingImageExamples
+    .filter(e => e.label && e.label.trim())
+    .map(e => ({ image_path: e.ref, label: e.label.trim() }));
+  if (image_examples.length < 6) { alert("至少需要 6 张已标注标签的图片"); return; }
+  if (new Set(image_examples.map(e => e.label)).size < 2) { alert("至少需要覆盖 2 个不同类别的标签"); return; }
+  await sendToConversation("structured", { type: "data_selected", image_examples });
+  pendingImageExamples = [];
+  $("imageThumbGrid").innerHTML = "";
+  $("imageUploadStatus").textContent = "";
+});
+
+// 生成式 VLM 数据卡片（VLM_GENERATIVE）：每张图片除了图，还需要问题/指令 + 参考答案
+let pendingVlmExamples = [];   // [{ref, previewUrl, prompt, reference_answer}]
+
+function renderVlmThumbGrid() {
+  const grid = $("vlmThumbGrid");
+  grid.innerHTML = "";
+  pendingVlmExamples.forEach((item, i) => {
+    const div = document.createElement("div");
+    div.className = "image-thumb-item";
+    div.innerHTML = `
+      <img src="${item.previewUrl}">
+      <input type="text" placeholder="问题/指令（可留空表示看图说话）" class="vlm-prompt-input" value="${escapeHtml(item.prompt || "")}">
+      <textarea placeholder="参考答案">${escapeHtml(item.reference_answer || "")}</textarea>
+    `;
+    div.querySelector(".vlm-prompt-input").addEventListener("input", (e) => {
+      pendingVlmExamples[i].prompt = e.target.value;
+    });
+    div.querySelector("textarea").addEventListener("input", (e) => {
+      pendingVlmExamples[i].reference_answer = e.target.value;
+    });
+    grid.appendChild(div);
+  });
+}
+
+$("vlmFilesBtn").addEventListener("click", () => $("vlmFilesInput").click());
+$("vlmFilesInput").addEventListener("change", async () => {
+  try {
+    const uploaded = await uploadImageFiles($("vlmFilesInput").files, $("vlmUploadStatus"));
+    pendingVlmExamples.push(...uploaded.map(u => ({ ...u, prompt: "", reference_answer: "" })));
+    renderVlmThumbGrid();
+  } catch (e) {
+    $("vlmUploadStatus").textContent = "";
+    alert("上传失败：" + e.message);
+  }
+  $("vlmFilesInput").value = "";
+});
+$("vlmExamplesSubmitBtn").addEventListener("click", async () => {
+  const vlm_examples = pendingVlmExamples
+    .filter(e => e.reference_answer && e.reference_answer.trim())
+    .map(e => ({ image_path: e.ref, prompt: (e.prompt || "").trim(), reference_answer: e.reference_answer.trim() }));
+  if (vlm_examples.length < 4) { alert("至少需要 4 条已填写参考答案的样本"); return; }
+  await sendToConversation("structured", { type: "data_selected", vlm_examples });
+  pendingVlmExamples = [];
+  $("vlmThumbGrid").innerHTML = "";
+  $("vlmUploadStatus").textContent = "";
+});
+
+// HF / 魔搭 搜索（结构一致，共用渲染逻辑）
+function renderDatasetResults(container, results, platform) {
+  container.innerHTML = "";
+  if (!results.length) { container.innerHTML = "<div class='field-hint'>没有找到匹配的数据集</div>"; return; }
+  for (const r of results) {
+    const card = document.createElement("div");
+    card.className = "dataset-result-card";
+    card.innerHTML = `
+      <div class="ds-ref">${escapeHtml(r.ref)}</div>
+      <div class="ds-desc">${escapeHtml((r.description || "").slice(0, 100))}</div>
+      <div class="ds-meta">↓ ${r.downloads} · ♥ ${r.likes}${r.tags.length ? " · " + r.tags.slice(0,3).map(escapeHtml).join(", ") : ""}</div>
+      <button type="button" class="btn-secondary">预览</button>
+    `;
+    card.querySelector("button").addEventListener("click", () => doPreview(platform, r.ref, { split: "train" }));
+    container.appendChild(card);
+  }
+}
+
+async function searchDatasets(platform, query, container) {
+  if (!query.trim()) return;
+  container.innerHTML = "<div class='field-hint'>搜索中…</div>";
+  try {
+    const res = await fetch(`${API_BASE}/api/datasets/search?platform=${platform}&query=${encodeURIComponent(query)}&page=1`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    renderDatasetResults(container, data, platform);
+  } catch (e) {
+    container.innerHTML = "";
+    alert("搜索失败：" + e.message);
+  }
+}
+
+$("hfSearchBtn").addEventListener("click", () => searchDatasets("huggingface", $("hfSearchInput").value, $("hfResults")));
+$("msSearchBtn").addEventListener("click", () => searchDatasets("modelscope", $("msSearchInput").value, $("msResults")));
+
+// ── 历史会话（localStorage 记录本浏览器创建过的 conversationId，点击时重新连 WS 重放）──
+const sessionsBlock = $("sessionsBlock");
+const sessionsList  = $("sessionsList");
+
+function loadSessions() {
+  try { return JSON.parse(localStorage.getItem(SESSIONS_KEY)) || []; }
+  catch { return []; }
+}
+function saveSessions(list) {
+  localStorage.setItem(SESSIONS_KEY, JSON.stringify(list.slice(0, MAX_SESSIONS)));
+}
+function addSession(entry) {
+  const list = loadSessions().filter(s => s.conversationId !== entry.conversationId);
+  list.unshift(entry);
+  saveSessions(list);
+  renderSessions();
+}
+function relativeTime(ts) {
+  const diffMin = Math.round((Date.now() - ts) / 60000);
+  if (diffMin < 1) return "刚刚";
+  if (diffMin < 60) return `${diffMin} 分钟前`;
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return `${diffH} 小时前`;
+  return `${Math.round(diffH / 24)} 天前`;
+}
+function renderSessions() {
+  const list = loadSessions();
+  sessionsBlock.style.display = list.length ? "block" : "none";
+  sessionsList.innerHTML = "";
+  // 置顶的排前面，组内保持原有的时间顺序（loadSessions() 本来就是新会话在前）——
+  // Array.prototype.sort 是稳定排序，只按"置顶与否"这一个维度比较，两个都置顶
+  // 或都不置顶的之间不会被打乱相对顺序
+  const sorted = [...list].sort((a, b) => (a.pinned ? 0 : 1) - (b.pinned ? 0 : 1));
+  for (const s of sorted) {
+    const tags = s.tags || [];
+    const el = document.createElement("div");
+    el.className = "session-item"
+      + (s.conversationId === conversationId ? " active" : "")
+      + (s.pinned ? " pinned" : "");
+    el.innerHTML =
+      `<div class="session-item-row">` +
+        `<span class="desc">${escapeHtml(s.label || s.conversationId)}</span>` +
+        (s.origin === "api" ? `<span class="tag-chip-mini api-origin-badge" title="通过 API 发起，网页上只读查看">API</span>` : "") +
+        // API 会话没有聊天窗口可看，光靠"API"徽标不知道它现在跑到哪一步了——
+        // 加一个状态点 + 阶段文字，训练中琥珀色脉冲、播报完毕（成功或失败）
+        // 变成稳定的鼠尾草绿，跟右侧结果区/Plan 面板已有的 status-dot 视觉语言一致
+        (s.origin === "api" && s.stage
+          ? `<span class="tag-chip-mini session-stage-badge" title="当前阶段">` +
+              `<span class="status-dot ${s.stage === "training" ? "running" : s.stage === "reporting" ? "completed" : ""}"></span>` +
+              `${escapeHtml(STAGE_LABELS[s.stage] || s.stage)}` +
+            `</span>`
+          : "") +
+        `<span class="time">${relativeTime(s.createdAt)}</span>` +
+        `<span class="actions">` +
+          `<button type="button" title="${s.pinned ? "取消置顶" : "置顶"}" data-act="pin" class="${s.pinned ? "active" : ""}">📌</button>` +
+          `<button type="button" title="标签" data-act="tag">🏷️</button>` +
+          `<button type="button" title="重命名" data-act="rename">✏️</button>` +
+          `<button type="button" title="创建分支" data-act="fork" class="fork-btn"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.492 2.492 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"></path></svg></button>` +
+          `<button type="button" title="删除" data-act="delete">🗑</button>` +
+        `</span>` +
+      `</div>` +
+      (tags.length
+        ? `<div class="session-tags">${tags.map(t => `<span class="tag-chip-mini">${escapeHtml(t)}</span>`).join("")}</div>`
+        : "");
+    el.addEventListener("click", () => loadSessionReplay(s.conversationId));
+    // 每个操作按钮各自 stopPropagation，不然点它们也会顺带触发外层
+    // "加载这个会话"的点击——按钮本身就嵌在可点击的整行里面
+    el.querySelector('[data-act="pin"]').addEventListener("click", (e) => {
+      e.stopPropagation();
+      togglePin(s.conversationId);
+    });
+    el.querySelector('[data-act="tag"]').addEventListener("click", (e) => {
+      e.stopPropagation();
+      openTagModal(s.conversationId);
+    });
+    el.querySelector('[data-act="rename"]').addEventListener("click", (e) => {
+      e.stopPropagation();
+      renameSession(s.conversationId);
+    });
+    el.querySelector('[data-act="fork"]').addEventListener("click", (e) => {
+      e.stopPropagation();
+      forkSession(s.conversationId);
+    });
+    el.querySelector('[data-act="delete"]').addEventListener("click", (e) => {
+      e.stopPropagation();
+      deleteSession(s.conversationId);
+    });
+    sessionsList.appendChild(el);
+  }
+}
+renderSessions();
+
+function togglePin(id) {
+  const list = loadSessions();
+  const entry = list.find(s => s.conversationId === id);
+  if (!entry) return;
+  entry.pinned = !entry.pinned;
+  saveSessions(list);
+  renderSessions();
+}
+
+function loadSessionReplay(id) {
+  if (ws) { try { ws.close(); } catch (e) {} ws = null; }
+  conversationId = id;
+  const entry = loadSessions().find(s => s.conversationId === id);
+  currentSessionOrigin = entry?.origin === "api" ? "api" : "web";
+  updateChatInputForOrigin();
+  connectConversationWs(id); // 连上后端会先推一条 "snapshot" 帧，里面是全量历史消息，足够重建聊天记录+训练可视化
+  renderSessions();
+}
+
+// 纯本地元数据——标签只用来在历史列表里显示，不需要同步给后端，直接改
+// localStorage 就行
+function renameSession(id) {
+  const list = loadSessions();
+  const entry = list.find(s => s.conversationId === id);
+  if (!entry) return;
+  const next = prompt("重命名这个会话：", entry.label || "");
+  if (next === null) return;   // 用户取消
+  entry.label = next.trim().slice(0, 40) || entry.label;
+  saveSessions(list);
+  renderSessions();
+}
+
+// 删除主要是从本地历史列表里移除；同时调用后端把服务端内存里的会话也真正
+// 释放掉（不删的话反正也会被 MAX_CONVERSATIONS 的 LRU 淘汰，但用户主动点删除
+// 应该立刻生效）——后端删除失败（比如已经被淘汰过）不影响本地列表照样移除。
+async function deleteSession(id) {
+  const list = loadSessions();
+  const entry = list.find(s => s.conversationId === id);
+  if (!entry) return;
+  if (!confirm(`删除会话「${entry.label || id}」？这个操作不能撤销。`)) return;
+  saveSessions(list.filter(s => s.conversationId !== id));
+  try {
+    await fetch(`${API_BASE}/api/conversations/${id}`, { method: "DELETE" });
+  } catch (e) { /* 服务端删不掉也无所谓，反正本地列表已经移除了 */ }
+  if (id === conversationId) {
+    if (ws) { try { ws.close(); } catch (e) {} ws = null; }
+    conversationId = null;
+    resetConversationView();
+  }
+  renderSessions();
+}
+
+// 创建分支：服务端深拷贝当前会话的完整状态到一个新的 conversation_id，
+// 两边之后各自独立推进——原会话完全不受影响，新分支直接加进历史列表并
+// 切换过去查看（分支出来的这份历史此刻和原会话完全一样，从这一秒开始分道扬镳）
+async function forkSession(id) {
+  const list = loadSessions();
+  const entry = list.find(s => s.conversationId === id);
+  if (!entry) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/conversations/${id}/fork`, { method: "POST" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    addSession({
+      conversationId: data.conversation_id,
+      label: `${(entry.label || id).slice(0, 36)}（分支）`,
+      createdAt: Date.now(),
+    });
+    loadSessionReplay(data.conversation_id);
+  } catch (e) {
+    alert("创建分支失败：" + e.message);
+  }
+}
+
+// ── 历史会话标签：算法类别/业务标签两组预设 + 自定义输入，纯本地元数据 ──────
+// 算法类别对应 config.py::TaskType 真实支持的任务类型，不是随便起的名字
+const ALGORITHM_TAG_PRESETS = ["分类", "多标签分类", "命名实体识别", "文本生成", "回归", "强化学习", "LLM微调"];
+// 业务标签没有系统内置的枚举可以对应——这组只是常见业务场景的快捷选项，
+// 选不中的场景直接用下面的自定义标签输入框
+const BUSINESS_TAG_PRESETS = ["客服", "电商", "金融", "医疗", "教育", "内容审核"];
+
+let tagEditingId = null;   // 当前标签编辑弹窗对应的会话，null 表示没打开
+
+function openTagModal(id) {
+  tagEditingId = id;
+  renderTagModal();
+  $("tagModalOverlay").style.display = "flex";
+}
+function closeTagModal() {
+  $("tagModalOverlay").style.display = "none";
+  tagEditingId = null;
+}
+function renderTagModal() {
+  const list = loadSessions();
+  const entry = list.find(s => s.conversationId === tagEditingId);
+  if (!entry) return;
+  const tags = entry.tags || [];
+
+  const chipsEl = $("tagCurrentChips");
+  chipsEl.innerHTML = tags.length
+    ? tags.map(t => `<button type="button" class="tag-chip" data-tag="${escapeHtml(t)}">${escapeHtml(t)} ×</button>`).join("")
+    : `<span class="field-hint">还没有标签</span>`;
+  chipsEl.querySelectorAll(".tag-chip").forEach(btn => {
+    btn.addEventListener("click", () => removeTag(btn.dataset.tag));
+  });
+
+  const renderPresetRow = (containerId, presets) => {
+    const el = $(containerId);
+    el.innerHTML = presets.map(t =>
+      `<button type="button" class="tag-preset-btn${tags.includes(t) ? " active" : ""}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`
+    ).join("");
+    el.querySelectorAll(".tag-preset-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (tags.includes(btn.dataset.tag)) removeTag(btn.dataset.tag);
+        else addTag(btn.dataset.tag);
+      });
+    });
+  };
+  renderPresetRow("tagAlgorithmPresets", ALGORITHM_TAG_PRESETS);
+  renderPresetRow("tagBusinessPresets", BUSINESS_TAG_PRESETS);
+}
+function addTag(tag) {
+  tag = tag.trim().slice(0, 20);
+  if (!tag) return;
+  const list = loadSessions();
+  const entry = list.find(s => s.conversationId === tagEditingId);
+  if (!entry) return;
+  entry.tags = entry.tags || [];
+  if (!entry.tags.includes(tag)) entry.tags.push(tag);
+  saveSessions(list);
+  renderTagModal();
+  renderSessions();
+}
+function removeTag(tag) {
+  const list = loadSessions();
+  const entry = list.find(s => s.conversationId === tagEditingId);
+  if (!entry) return;
+  entry.tags = (entry.tags || []).filter(t => t !== tag);
+  saveSessions(list);
+  renderTagModal();
+  renderSessions();
+}
+$("tagModalCloseBtn").addEventListener("click", closeTagModal);
+$("tagModalOverlay").addEventListener("click", (e) => { if (e.target === $("tagModalOverlay")) closeTagModal(); });
+$("tagCustomAddBtn").addEventListener("click", () => {
+  const input = $("tagCustomInput");
+  addTag(input.value);
+  input.value = "";
+});
+$("tagCustomInput").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  addTag(e.target.value);
+  e.target.value = "";
+});
+
+// ── 样本解析（"文本 | 标签" 每行一条）───────────────────────────────
+function parseExamples(raw) {
+  const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
+  const examples = [];
+  for (const line of lines) {
+    const idx = line.lastIndexOf("|");
+    if (idx === -1) continue;
+    const text = line.slice(0, idx).trim();
+    const label = line.slice(idx + 1).trim();
+    if (text && label) examples.push({ text, label });
+  }
+  return examples;
+}
+
+function updateExampleCount() {
+  const examples = parseExamples(examplesInput.value);
+  const labels = new Set(examples.map(e => e.label));
+  exampleCountEl.textContent = `${examples.length} 条样本，${labels.size} 个标签`;
+  exampleCountEl.className = "example-count " + (examples.length >= 5 && labels.size >= 2 ? "ok" : "err");
+  return { examples, labels };
+}
+examplesInput.addEventListener("input", updateExampleCount);
+updateExampleCount();
+
+// ── 队列状态轮询 ─────────────────────────────────────────────────────
+async function pollQueueStats() {
+  try {
+    const res = await fetch(`${API_BASE}/api/tasks/queue/stats`);
+    if (!res.ok) return;
+    const data = await res.json();
+    $("queueN").textContent = `运行 ${data.running} · 排队 ${data.queued}`;
+  } catch (e) { /* 后端未启动时静默失败，不打扰用户 */ }
+}
+pollQueueStats();
+setInterval(pollQueueStats, 5000);
+
+function appendLog(event) {
+  const line = document.createElement("div");
+  const t = new Date().toLocaleTimeString();
+  line.textContent = `[${t}] ${event.type} ${JSON.stringify(event).slice(0, 120)}`;
+  logLines.appendChild(line);
+  logLines.scrollTop = logLines.scrollHeight;
+}
+
+// ── 渲染 ─────────────────────────────────────────────────────────────
+function render(s) {
+  // 指标卡片
+  if (s.epochHistory.length) {
+    const last = s.epochHistory[s.epochHistory.length - 1];
+    $("curMetric").textContent = (last.valMetric * 100).toFixed(1) + "%";
+    $("curMetricSub").textContent = `迭代 ${last.iteration} · Epoch ${last.epoch} · 最佳 ${(s.bestMetric*100).toFixed(1)}%`;
+  }
+  if (s.dataReport) {
+    $("dataCount").textContent = s.dataReport.totalSamples;
+    $("dataSub").textContent = `原始+增强 ${s.dataReport.augmented} 条 · 质量分 ${s.dataReport.qualityScore?.toFixed(2) ?? "—"}`;
+  }
+
+  // 警告
+  const warnArea = $("warningsArea");
+  warnArea.innerHTML = "";
+  if (s.dataReport?.warnings?.length) {
+    for (const w of s.dataReport.warnings) {
+      const el = document.createElement("div");
+      el.className = "warn-chip";
+      el.textContent = "⚠ " + w;
+      warnArea.appendChild(el);
+    }
+  }
+  if (s.error) {
+    const el = document.createElement("div");
+    el.className = "warn-chip";
+    el.textContent = "✕ " + s.error;
+    warnArea.appendChild(el);
+  }
+  for (const fb of s.nnFallbacks) {
+    const el = document.createElement("div");
+    el.className = "warn-chip";
+    el.textContent = `⚠ ${fb.stage} 第 ${fb.attempt} 次尝试失败，已降级：${fb.reason.slice(0, 160)}`;
+    warnArea.appendChild(el);
+  }
+
+  // 模型架构卡片（仅 pretrained_nn / custom_nn 后端会有 arch_designed 事件）
+  if (s.archInfo) {
+    $("archCard").style.display = "block";
+    const a = s.archInfo;
+    if (a.mode === "custom_nn") {
+      $("archBody").innerHTML = `
+        <div class="metric-sub">LLM 生成的分类头：<b style="color:var(--text)">${escapeHtml(a.className || "")}</b> · 损失函数 ${escapeHtml(a.lossFn || "")}</div>
+        <div class="metric-sub" style="margin-top:6px">${escapeHtml(a.rationale || "")}</div>
+        <details style="margin-top:8px">
+          <summary style="cursor:pointer; font-family:var(--mono); font-size:11px; color:var(--muted)">查看生成的代码</summary>
+          <div class="code-block">${escapeHtml(a.code || "")}</div>
+        </details>
+      `;
+    } else {
+      $("archBody").innerHTML = `
+        <div class="metric-sub">预训练模型：<b style="color:var(--text)">${escapeHtml(a.modelId || "")}</b>${a.useLora ? " · 使用 LoRA" : " · 全量微调"}</div>
+        <div class="metric-sub" style="margin-top:6px">${escapeHtml(a.rationale || "")}</div>
+      `;
+    }
+    if (s.parallelPrep) {
+      const p = s.parallelPrep;
+      const note = p.designReused
+        ? `模型设计已在数据准备阶段并行完成并直接复用（省了一次调用）`
+        : `模型设计并行尝试未通过校验，训练前重新设计了一次`;
+      $("archBody").innerHTML += `
+        <div class="metric-sub" style="margin-top:8px">⚡ 数据准备 ${p.dataSeconds}s ／ 模型设计 ${p.designSeconds}s（并行执行）· ${note}</div>
+      `;
+    }
+  }
+
+  // 学习曲线
+  drawChart(s.epochHistory);
+
+  // 迭代日志（signature element）
+  renderJournal(s);
+
+  // 部署卡片
+  if (s.deploy && !s.deploy.error) {
+    $("deployCard").style.display = "block";
+    // 两个下载出口对应两件不同的事：模型包是拿去部署/上传模型平台的（带权重），
+    // 代码包是拿去归档/推代码仓库的（不含权重，见 core/export_packager.py 的说明）
+    const downloadRow = s.taskId ? `
+      <div class="table-actions" style="margin-top:8px">
+        <a class="btn-secondary btn-compact" style="text-decoration:none"
+           href="${API_BASE}/api/tasks/${encodeURIComponent(s.taskId)}/export/model"
+           download>下载模型包</a>
+        <a class="btn-secondary btn-compact" style="text-decoration:none"
+           href="${API_BASE}/api/tasks/${encodeURIComponent(s.taskId)}/export/code"
+           download>下载代码包</a>
+      </div>` : "";
+    $("deployBody").innerHTML = `
+      <div class="metric-sub">格式：<b style="color:var(--text)">${s.deploy.format.toUpperCase()}</b> · 体积 ${s.deploy.sizeKb.toFixed(1)} KB · 标签：${s.deploy.labels.join("、")}</div>
+      <div class="code-block">${escapeHtml(s.deploy.usageExample)}</div>
+      ${downloadRow}
+    `;
+  }
+}
+
+function renderJournal(s) {
+  const journal = $("journal");
+  journal.innerHTML = "";
+  s.iterations.forEach((it) => {
+    const lastMetric = it.epochs.length ? it.epochs[it.epochs.length - 1].valMetric : null;
+    const cls = it.explanation
+      ? (it.explanation.nextAction?.startsWith("stop") ? "positive" : "pending")
+      : "pending";
+
+    const entry = document.createElement("div");
+    entry.className = "journal-entry " + cls;
+
+    const actionLabelMap = {
+      stop_success: "达成目标", stop_plateau: "触达瓶颈", collect_more_data: "追加数据",
+      continue_training: "继续训练", adjust_hyperparams: "调整超参",
+    };
+
+    entry.innerHTML = `
+      <div class="journal-head">
+        <span class="journal-iter-n">迭代 ${it.iteration}</span>
+        <span class="journal-metric">${lastMetric != null ? (lastMetric*100).toFixed(1) + "%" : "训练中…"}</span>
+        ${it.explanation ? `<span class="journal-action">${actionLabelMap[it.explanation.nextAction] || it.explanation.nextAction}</span>` : ""}
+      </div>
+      <div class="epoch-ticks">${it.epochs.map(e => `<div class="epoch-tick" style="height:${8 + e.valMetric*24}px; background:var(--amber-dim)"></div>`).join("")}</div>
+      ${it.explanation ? `
+        <div class="journal-body">
+          <div class="diag">${escapeHtml(it.explanation.diagnosis)}</div>
+          <div class="cause">${escapeHtml(it.explanation.rootCause)}</div>
+          <div class="rec"><b>建议</b><br>${escapeHtml(it.explanation.recommendation)}</div>
+        </div>
+      ` : ""}
+      ${it.hyperparamChanges ? `
+        <div class="journal-body">
+          <div class="rec"><b>⚙️ 自动调参</b><br>${escapeHtml(formatHyperparamChanges(it.hyperparamChanges))}</div>
+        </div>
+      ` : ""}
+    `;
+    journal.appendChild(entry);
+  });
+}
+
+function drawChart(epochHistory) {
+  const canvas = $("chart");
+  const ctx = canvas.getContext("2d");
+  const w = canvas.clientWidth || 600;
+  const h = 130;
+  canvas.width = w * devicePixelRatio;
+  canvas.height = h * devicePixelRatio;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  ctx.clearRect(0, 0, w, h);
+
+  if (!epochHistory.length) {
+    ctx.fillStyle = "#8b93a3";
+    ctx.font = "12px Inter";
+    ctx.fillText("等待训练数据…", w/2 - 40, h/2);
+    return;
+  }
+
+  const pad = 30;
+  const xs = epochHistory.map((_, i) => pad + i * ((w - pad*2) / Math.max(epochHistory.length - 1, 1)));
+  const ys = epochHistory.map(e => h - pad - e.valMetric * (h - pad*1.5));
+
+  // grid
+  ctx.strokeStyle = "#2d3440";
+  ctx.lineWidth = 1;
+  [0, 0.5, 1].forEach(v => {
+    const y = h - pad - v * (h - pad*1.5);
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w - 10, y); ctx.stroke();
+  });
+
+  // line
+  ctx.strokeStyle = "#e8a33d";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  xs.forEach((x, i) => i === 0 ? ctx.moveTo(x, ys[i]) : ctx.lineTo(x, ys[i]));
+  ctx.stroke();
+
+  // dots
+  ctx.fillStyle = "#e8a33d";
+  xs.forEach((x, i) => { ctx.beginPath(); ctx.arc(x, ys[i], 3, 0, 7); ctx.fill(); });
+}
+
+function formatHyperparamChanges(changes) {
+  const parts = [];
+  if (changes.switch_model) parts.push(`切换模型 → ${changes.switch_model}`);
+  if (changes.C !== undefined) parts.push(`正则强度 C = ${changes.C}`);
+  if (changes.alpha !== undefined) parts.push(`正则强度 alpha = ${changes.alpha}`);
+  if (changes.class_boost) {
+    const boosts = Object.entries(changes.class_boost).map(([k,v]) => `${k}×${v}`).join("、");
+    parts.push(`过采样补偿：${boosts}`);
+  }
+  return parts.join("；") || "（无具体改动）";
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str ?? "";
+  return div.innerHTML;
+}
+
+// FastAPI 422 校验错误的 detail 是对象数组（[{loc, msg, type}, ...]），不是字符串——
+// 直接 new Error(data.detail) 会把数组 toString 成 "[object Object]"，用户完全看不懂
+function apiErrorMessage(data, res) {
+  const detail = data && data.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map(d => d.msg || JSON.stringify(d)).join("；");
+  }
+  return `HTTP ${res.status}`;
+}
+
+// ── 账号体系：登录/注册/头像/个人信息/安全设置/用量 ──────────────────────────
+// 这一整块都是纯新增，不碰 reduceEvent/initialState 契约，也不影响上面任何
+// 训练对话逻辑——accessToken 只存在模块级变量 authState 里（声明在文件靠前的
+// 状态变量区，不放 localStorage，降低 XSS 窃取风险），refresh token 走
+// HttpOnly cookie，浏览器自动带上。
+function authHeaders() {
+  return authState.accessToken ? { "Authorization": `Bearer ${authState.accessToken}` } : {};
+}
+
+async function tryRefresh() {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, { method: "POST", credentials: "include" });
+    if (!res.ok) return false;
+    const data = await res.json();
+    authState.accessToken = data.access_token;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchMe() {
+  const res = await fetch(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+function initialsFromName(name) {
+  return (name || "?").trim().slice(0, 1).toUpperCase();
+}
+
+function updateAuthUI() {
+  const loggedIn = !!authState.user;
+  $("authLoggedOut").style.display = loggedIn ? "none" : "block";
+  $("authLoggedIn").style.display = loggedIn ? "block" : "none";
+  if (loggedIn) {
+    const u = authState.user;
+    $("displayNameLabel").textContent = u.display_name || u.email;
+    const circle = $("avatarCircle");
+    if (u.avatar_url) {
+      circle.style.backgroundImage = `url(${u.avatar_url})`;
+      circle.textContent = "";
+    } else {
+      circle.style.backgroundImage = "";
+      circle.textContent = initialsFromName(u.display_name || u.email);
+    }
+  }
+  updateProviderUI();   // "系统托管" 选项的提示文案依赖登录态，登录/退出后要立刻刷新
+  if (loggedIn) { mergeApiSessions(); startApiSessionsPolling(); } else { stopApiSessionsPolling(); }
+}
+
+// 登录后把这个账号名下、通过 API token 发起的会话也拉进本地会话列表——本地
+// localStorage 只知道"这个浏览器自己创建过哪些会话"，API 发起的会话从来没有
+// 经过这个浏览器，必须主动去问后端才能知道。已经在本地列表里的（比如浏览器
+// 自己创建、且这个浏览器也登录着同一账号）只更新 origin 字段，不重复添加。
+async function mergeApiSessions() {
+  try {
+    const res = await fetch(`${API_BASE}/api/conversations`, { headers: authHeaders() });
+    if (!res.ok) return;
+    const remote = await res.json();
+    const local = loadSessions();
+    const localIds = new Set(local.map(s => s.conversationId));
+    let changed = false;
+    for (const r of remote) {
+      const existing = local.find(s => s.conversationId === r.conversation_id);
+      if (existing) {
+        if (existing.origin !== r.origin) { existing.origin = r.origin; changed = true; }
+        // stage 会随着 API 调用方继续推进对话/训练而变化——每次轮询都要覆盖，
+        // 不只是"发现了才更新"，否则列表里的状态标签会一直停在第一次看到时的样子
+        if (existing.stage !== r.stage) { existing.stage = r.stage; changed = true; }
+        continue;
+      }
+      local.unshift({
+        conversationId: r.conversation_id,
+        label: r.task_type ? `[API] ${r.task_type}` : "[API] 会话",
+        createdAt: new Date(r.created_at).getTime() || Date.now(),
+        origin: r.origin,
+        stage: r.stage,
+      });
+      changed = true;
+    }
+    if (changed) { saveSessions(local); renderSessions(); }
+  } catch (e) { /* 拉取失败不影响主流程，本地列表照常展示 */ }
+}
+
+// 登录期间定期轮询一次——API 发起的训练可能在用户打开这个网页之后才开始，
+// 光靠登录那一刻拉一次是看不到的；轮询间隔不需要很短，这里只是"列表里有没有
+// 出现新会话/状态有没有变"，真正的训练指标一旦点进某个会话，靠的是 WS 实时
+// 推送（见 connectConversationWs），不依赖这个轮询
+let apiSessionsPollTimer = null;
+function startApiSessionsPolling() {
+  if (apiSessionsPollTimer) return;
+  apiSessionsPollTimer = setInterval(mergeApiSessions, 15000);
+}
+function stopApiSessionsPolling() {
+  if (!apiSessionsPollTimer) return;
+  clearInterval(apiSessionsPollTimer);
+  apiSessionsPollTimer = null;
+}
+
+async function refreshSessionOnLoad() {
+  const ok = await tryRefresh();
+  if (ok) {
+    authState.user = await fetchMe();
+  }
+  updateAuthUI();
+}
+
+// ── 登录/注册模态框 ───────────────────────────────────────────────────
+const authModalOverlay = $("authModalOverlay");
+const authTabLogin = $("authTabLogin");
+const authTabRegister = $("authTabRegister");
+const authDisplayNameField = $("authDisplayNameField");
+const authSubmitBtn = $("authSubmitBtn");
+const authStatus = $("authStatus");
+let authMode = "login";
+
+function setAuthMode(mode) {
+  authMode = mode;
+  authTabLogin.classList.toggle("active", mode === "login");
+  authTabRegister.classList.toggle("active", mode === "register");
+  authDisplayNameField.style.display = mode === "register" ? "block" : "none";
+  authSubmitBtn.textContent = mode === "register" ? "注册" : "登录";
+  authStatus.textContent = "";
+}
+authTabLogin.addEventListener("click", () => setAuthMode("login"));
+authTabRegister.addEventListener("click", () => setAuthMode("register"));
+
+function openAuthModal(mode) {
+  setAuthMode(mode);
+  $("authEmailInput").value = "";
+  $("authPasswordInput").value = "";
+  $("authDisplayNameInput").value = "";
+  authModalOverlay.style.display = "flex";
+}
+function closeAuthModal() { authModalOverlay.style.display = "none"; }
+
+$("loginOpenBtn").addEventListener("click", () => openAuthModal("login"));
+$("registerOpenBtn").addEventListener("click", () => openAuthModal("register"));
+$("authModalCloseBtn").addEventListener("click", closeAuthModal);
+authModalOverlay.addEventListener("click", (e) => { if (e.target === authModalOverlay) closeAuthModal(); });
+
+authSubmitBtn.addEventListener("click", async () => {
+  const email = $("authEmailInput").value.trim();
+  const password = $("authPasswordInput").value;
+  if (!email || !password) { authStatus.textContent = "请填写邮箱和密码"; return; }
+  authStatus.textContent = "处理中…";
+  try {
+    const path = authMode === "register" ? "/api/auth/register" : "/api/auth/login";
+    const body = authMode === "register"
+      ? { email, password, display_name: $("authDisplayNameInput").value.trim() || null }
+      : { email, password };
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      credentials: "include", body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    authState.accessToken = data.access_token;
+    authState.user = await fetchMe();
+    updateAuthUI();
+    closeAuthModal();
+  } catch (e) {
+    authStatus.textContent = e.message;
+  }
+});
+
+$("googleLoginBtn").addEventListener("click", () => {
+  window.location.href = `${API_BASE}/api/auth/google/login`;
+});
+
+// ── Google 邮箱冲突：确认关联已有账号 ──────────────────────────────────
+const linkModalOverlay = $("linkModalOverlay");
+let pendingLinkCode = null;
+
+function openLinkModal(linkCode, email) {
+  pendingLinkCode = linkCode;
+  $("linkEmailLabel").textContent = email;
+  $("linkPasswordInput").value = "";
+  $("linkStatus").textContent = "";
+  linkModalOverlay.style.display = "flex";
+}
+$("linkModalCloseBtn").addEventListener("click", () => { linkModalOverlay.style.display = "none"; });
+
+$("linkSubmitBtn").addEventListener("click", async () => {
+  const password = $("linkPasswordInput").value;
+  if (!password || !pendingLinkCode) return;
+  $("linkStatus").textContent = "处理中…";
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/google/confirm-link`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      credentials: "include", body: JSON.stringify({ link_code: pendingLinkCode, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    authState.accessToken = data.access_token;
+    authState.user = await fetchMe();
+    updateAuthUI();
+    linkModalOverlay.style.display = "none";
+  } catch (e) {
+    $("linkStatus").textContent = e.message;
+  }
+});
+
+// 页面加载时处理 Google 回调带回来的查询参数（一次性 exchange/link code）
+async function handleOAuthRedirectParams() {
+  const params = new URLSearchParams(location.search);
+  const exchangeCode = params.get("oauth_exchange");
+  const linkCode = params.get("oauth_link");
+  const linkEmail = params.get("email");
+  if (exchangeCode) {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/oauth/exchange`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        credentials: "include", body: JSON.stringify({ code: exchangeCode }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        authState.accessToken = data.access_token;
+        authState.user = await fetchMe();
+        updateAuthUI();
+      }
+    } catch { /* 忽略，用户可以重新登录 */ }
+    history.replaceState({}, "", location.pathname);
+  } else if (linkCode) {
+    openLinkModal(linkCode, linkEmail || "");
+    history.replaceState({}, "", location.pathname);
+  }
+}
+
+// ── 头像下拉菜单 ─────────────────────────────────────────────────────
+const avatarDropdown = $("avatarDropdown");
+$("avatarBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  avatarDropdown.style.display = avatarDropdown.style.display === "block" ? "none" : "block";
+});
+document.addEventListener("click", () => { avatarDropdown.style.display = "none"; });
+
+$("logoutBtn").addEventListener("click", async () => {
+  await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" });
+  authState = { accessToken: null, user: null };
+  updateAuthUI();
+});
+
+// ── 个人信息 / 安全设置 / 用量 模态框 ──────────────────────────────────
+const profileModalOverlay = $("profileModalOverlay");
+const profileTabs = {
+  info: { tab: $("profileTabInfo"), pane: $("profilePaneInfo") },
+  security: { tab: $("profileTabSecurity"), pane: $("profilePaneSecurity") },
+  usage: { tab: $("profileTabUsage"), pane: $("profilePaneUsage") },
+  config: { tab: $("profileTabConfig"), pane: $("profilePaneConfig") },
+  apikeys: { tab: $("profileTabApiKeys"), pane: $("profilePaneApiKeys") },
+  compute: { tab: $("profileTabCompute"), pane: $("profilePaneCompute") },
+};
+function setProfileTab(name) {
+  for (const [key, { tab, pane }] of Object.entries(profileTabs)) {
+    tab.classList.toggle("active", key === name);
+    pane.style.display = key === name ? "block" : "none";
+  }
+  if (name === "usage") loadUsage();
+  if (name === "apikeys") loadApiTokens();
+  if (name === "compute") loadComputeProfiles();
+}
+profileTabs.info.tab.addEventListener("click", () => setProfileTab("info"));
+profileTabs.security.tab.addEventListener("click", () => setProfileTab("security"));
+profileTabs.usage.tab.addEventListener("click", () => setProfileTab("usage"));
+profileTabs.config.tab.addEventListener("click", () => setProfileTab("config"));
+profileTabs.apikeys.tab.addEventListener("click", () => setProfileTab("apikeys"));
+profileTabs.compute.tab.addEventListener("click", () => setProfileTab("compute"));
+
+function openProfileModal() {
+  if (!authState.user) return;
+  $("profileEmailLabel").textContent = authState.user.email;
+  $("profileDisplayNameInput").value = authState.user.display_name || "";
+  const preview = $("profileAvatarPreview");
+  if (authState.user.avatar_url) {
+    preview.style.backgroundImage = `url(${authState.user.avatar_url})`;
+    preview.textContent = "";
+  } else {
+    preview.style.backgroundImage = "";
+    preview.textContent = initialsFromName(authState.user.display_name || authState.user.email);
+  }
+  $("profileStatus").textContent = "";
+  $("securityStatus").textContent = "";
+  $("currentPasswordInput").value = "";
+  $("newPasswordInput").value = "";
+  setProfileTab("info");
+  profileModalOverlay.style.display = "flex";
+}
+$("openProfileBtn").addEventListener("click", () => { avatarDropdown.style.display = "none"; openProfileModal(); });
+$("openUsageBtn").addEventListener("click", () => { avatarDropdown.style.display = "none"; openProfileModal(); setProfileTab("usage"); });
+$("openConfigBtn").addEventListener("click", () => { avatarDropdown.style.display = "none"; openProfileModal(); setProfileTab("config"); });
+$("profileModalCloseBtn").addEventListener("click", () => { profileModalOverlay.style.display = "none"; });
+profileModalOverlay.addEventListener("click", (e) => { if (e.target === profileModalOverlay) profileModalOverlay.style.display = "none"; });
+
+$("avatarUploadBtn").addEventListener("click", () => $("avatarFileInput").click());
+$("avatarFileInput").addEventListener("change", async () => {
+  const file = $("avatarFileInput").files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append("file", file);
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/me/avatar`, {
+      method: "POST", headers: authHeaders(), body: form,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    authState.user = data;
+    updateAuthUI();
+    openProfileModal();
+  } catch (e) {
+    alert("头像上传失败：" + e.message);
+  }
+});
+
+$("profileSaveBtn").addEventListener("click", async () => {
+  const displayName = $("profileDisplayNameInput").value.trim();
+  $("profileStatus").textContent = "保存中…";
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/me`, {
+      method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ display_name: displayName || null }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    authState.user = data;
+    updateAuthUI();
+    $("profileStatus").textContent = "已保存";
+  } catch (e) {
+    $("profileStatus").textContent = e.message;
+  }
+});
+
+$("changePasswordBtn").addEventListener("click", async () => {
+  const current_password = $("currentPasswordInput").value;
+  const new_password = $("newPasswordInput").value;
+  if (!current_password || !new_password) { $("securityStatus").textContent = "请填写当前密码和新密码"; return; }
+  $("securityStatus").textContent = "处理中…";
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/change-password`, {
+      method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ current_password, new_password }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(apiErrorMessage(data, res));
+    }
+    $("currentPasswordInput").value = "";
+    $("newPasswordInput").value = "";
+    $("securityStatus").textContent = "密码已修改";
+  } catch (e) {
+    $("securityStatus").textContent = e.message;
+  }
+});
+
+async function loadUsage() {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/me/usage`, { headers: authHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    $("usageSummaryLabel").textContent =
+      `${data.period} 已用 ${data.calls_used} / ${data.calls_limit} 次，共 ${data.total_tokens} tokens`;
+    $("usageTableBody").innerHTML = data.events.map(ev => `
+      <tr>
+        <td>${escapeHtml(ev.created_at.slice(0, 19).replace("T", " "))}</td>
+        <td>${escapeHtml(ev.model)}</td>
+        <td>${ev.prompt_tokens}</td>
+        <td>${ev.completion_tokens}</td>
+        <td>${ev.total_tokens}</td>
+        <td>${escapeHtml(ev.task_id || ev.conversation_id || "—")}</td>
+      </tr>`).join("") || `<tr><td colspan="6">本月还没有用量记录</td></tr>`;
+  } catch (e) {
+    $("usageSummaryLabel").textContent = "加载用量失败：" + e.message;
+  }
+}
+
+// ── API 密钥（长期 token，给外部调用方用）─────────────────────────────────
+async function loadApiTokens() {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/api-tokens`, { headers: authHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    // 完整 token 从创建那一刻起就只在后端存了哈希，列表里天然拿不到明文——
+    // 这里显示的是 token_prefix（创建时明文存的前 12 位，专门为了"列表里认出
+    // 哪个是哪个"这个用途），用星号补齐掩饰成"看起来像完整 token"的样子，
+    // 复制 icon 复制的也是这个前缀（不是、也不可能是完整可用的 token）。
+    $("apiTokenTableBody").innerHTML = data.map(t => `
+      <tr style="${t.revoked ? 'opacity:.5' : ''}">
+        <td>${escapeHtml(t.name)}</td>
+        <td>
+          <span class="token-masked" style="font-family:var(--mono)">${escapeHtml(t.token_prefix)}***</span>
+          <button type="button" class="btn-icon" title="复制前缀" data-copy-prefix="${escapeHtml(t.token_prefix)}">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="5.5" y="5.5" width="8" height="8" rx="1.2"></rect><path d="M3.5 10.5h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v1"></path></svg>
+          </button>
+        </td>
+        <td>${escapeHtml(t.llm_provider)}</td>
+        <td>${escapeHtml(t.llm_model || "（默认）")}</td>
+        <td>${escapeHtml(t.created_at.slice(0, 19).replace("T", " "))}</td>
+        <td>${t.last_used_at ? escapeHtml(t.last_used_at.slice(0, 19).replace("T", " ")) : "从未使用"}</td>
+        <td>${t.revoked ? "已撤销" : `<button type="button" class="btn-secondary" data-revoke="${t.id}">撤销</button>`}</td>
+      </tr>`).join("") || `<tr><td colspan="7">还没有创建过 API Token</td></tr>`;
+    $("apiTokenTableBody").querySelectorAll("[data-revoke]").forEach(btn => {
+      btn.addEventListener("click", () => revokeApiToken(btn.dataset.revoke));
+    });
+    $("apiTokenTableBody").querySelectorAll("[data-copy-prefix]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        navigator.clipboard.writeText(btn.dataset.copyPrefix).then(() => {
+          const original = btn.innerHTML;
+          btn.textContent = "✓";
+          setTimeout(() => { btn.innerHTML = original; }, 1200);
+        });
+      });
+    });
+  } catch (e) {
+    $("apiTokenTableBody").innerHTML = `<tr><td colspan="7">加载失败：${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+async function revokeApiToken(id) {
+  if (!confirm("撤销后这个 token 立即失效，且无法恢复，确定吗？")) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/api-tokens/${id}`, { method: "DELETE", headers: authHeaders() });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(apiErrorMessage(data, res));
+    }
+    loadApiTokens();
+  } catch (e) {
+    alert("撤销失败：" + e.message);
+  }
+}
+
+// ── 计算资源（Slurm / Kubernetes）配置 ─────────────────────────────────
+// 凭据（kubeconfig / SSH 私钥）保存后后端不再回传，列表里只显示"已保存/未保存"，
+// 跟 API token 那边只显示 prefix 是同一个原则：配置界面不是凭据查看器。
+function computeTargetSummary(p) {
+  if (p.backend === "kubernetes") {
+    return `${escapeHtml(p.k8s_namespace || "default")} · ${escapeHtml(p.k8s_image || "未指定镜像")}`;
+  }
+  const hostPart = `${escapeHtml(p.slurm_username || "?")}@${escapeHtml(p.slurm_host || "?")}`;
+  return p.slurm_partition ? `${hostPart} · ${escapeHtml(p.slurm_partition)}` : hostPart;
+}
+
+async function loadComputeProfiles() {
+  try {
+    const res = await fetch(`${API_BASE}/api/compute-profiles`, { headers: authHeaders() });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    $("computeProfileTableBody").innerHTML = data.map(p => `
+      <tr style="${p.revoked ? 'opacity:.5' : ''}">
+        <td>${escapeHtml(p.name)}</td>
+        <td>${p.backend === "kubernetes" ? "Kubernetes" : "Slurm"}</td>
+        <td>
+          ${computeTargetSummary(p)}
+          <div class="field-hint" style="margin-top:2px">
+            凭据${(p.has_kubeconfig || p.has_ssh_key) ? "已保存" : "未配置"} ·
+            ${escapeHtml(p.created_at.slice(0, 10))}
+          </div>
+        </td>
+        <td>${p.revoked ? "已撤销" : `
+          <div class="table-actions">
+            <button type="button" class="btn-secondary btn-compact" data-test-compute="${p.id}">测试连接</button>
+            <button type="button" class="btn-secondary btn-compact" data-revoke-compute="${p.id}">删除</button>
+          </div>`}</td>
+      </tr>
+      <tr data-result-row="${p.id}" style="display:none"><td colspan="4" class="field-hint" data-result-for="${p.id}"></td></tr>
+    `).join("") || `<tr><td colspan="4">还没有配置计算资源，训练会在本机运行</td></tr>`;
+    $("computeProfileTableBody").querySelectorAll("[data-test-compute]").forEach(btn => {
+      btn.addEventListener("click", () => testComputeProfile(btn.dataset.testCompute, btn));
+    });
+    $("computeProfileTableBody").querySelectorAll("[data-revoke-compute]").forEach(btn => {
+      btn.addEventListener("click", () => revokeComputeProfile(btn.dataset.revokeCompute));
+    });
+  } catch (e) {
+    $("computeProfileTableBody").innerHTML = `<tr><td colspan="4">加载失败：${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+async function testComputeProfile(id, btn) {
+  // 结果就地展示在这一行下面，而不是弹 alert——连接失败的信息通常比较长
+  // （带着集群返回的原始原因），alert 里读起来很难受
+  const cell = $("computeProfileTableBody").querySelector(`[data-result-for="${id}"]`);
+  const row = $("computeProfileTableBody").querySelector(`[data-result-row="${id}"]`);
+  row.style.display = "table-row";
+  cell.textContent = "正在连接…";
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/compute-profiles/${id}/test`, {
+      method: "POST", headers: authHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    cell.innerHTML = `<span style="color:${data.ok ? 'var(--sage)' : 'var(--coral)'}">`
+      + `${data.ok ? "✓" : "✗"} ${escapeHtml(data.message)}</span>`
+      + (data.detail ? `<div style="opacity:.7; margin-top:2px">${escapeHtml(data.detail)}</div>` : "");
+  } catch (e) {
+    cell.innerHTML = `<span style="color:var(--coral)">✗ 测试失败：${escapeHtml(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function revokeComputeProfile(id) {
+  if (!confirm("删除后这个计算资源配置立即失效，正在跑的任务不受影响。确定吗？")) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/compute-profiles/${id}`, { method: "DELETE", headers: authHeaders() });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(apiErrorMessage(data, res));
+    }
+    loadComputeProfiles();
+  } catch (e) {
+    alert("删除失败：" + e.message);
+  }
+}
+
+function currentComputeBackend() {
+  return document.querySelector('input[name="computeBackend"]:checked').value;
+}
+function updateComputeBackendFields() {
+  const backend = currentComputeBackend();
+  $("computeK8sSlot").style.display = backend === "kubernetes" ? "block" : "none";
+  $("computeSlurmSlot").style.display = backend === "slurm" ? "block" : "none";
+}
+document.querySelectorAll('input[name="computeBackend"]').forEach(r =>
+  r.addEventListener("change", updateComputeBackendFields));
+
+$("newComputeProfileBtn").addEventListener("click", () => {
+  const form = $("newComputeProfileForm");
+  form.style.display = form.style.display === "none" ? "block" : "none";
+  $("computeCreateStatus").textContent = "";
+  updateComputeBackendFields();
+});
+$("cancelComputeProfileBtn").addEventListener("click", () => {
+  $("newComputeProfileForm").style.display = "none";
+});
+
+$("createComputeProfileBtn").addEventListener("click", async () => {
+  const name = $("computeNameInput").value.trim();
+  if (!name) { alert("请填写名称"); return; }
+  const backend = currentComputeBackend();
+  const body = { name, backend };
+  if (backend === "kubernetes") {
+    body.k8s_kubeconfig = $("computeKubeconfigInput").value.trim() || null;
+    body.k8s_namespace = $("computeNamespaceInput").value.trim() || null;
+    body.k8s_image = $("computeImageInput").value.trim() || null;
+    body.k8s_cpu = $("computeCpuInput").value.trim() || null;
+    body.k8s_memory = $("computeMemoryInput").value.trim() || null;
+    const gpu = $("computeGpuInput").value.trim();
+    body.k8s_gpu = gpu ? Number(gpu) : null;
+  } else {
+    body.slurm_host = $("computeSlurmHostInput").value.trim() || null;
+    const port = $("computeSlurmPortInput").value.trim();
+    body.slurm_port = port ? Number(port) : null;
+    body.slurm_username = $("computeSlurmUserInput").value.trim() || null;
+    body.slurm_ssh_private_key = $("computeSlurmKeyInput").value.trim() || null;
+    body.slurm_partition = $("computeSlurmPartitionInput").value.trim() || null;
+    body.slurm_workdir = $("computeSlurmWorkdirInput").value.trim() || null;
+    body.slurm_time_limit = $("computeSlurmTimeInput").value.trim() || null;
+  }
+  $("computeCreateStatus").textContent = "保存中…";
+  try {
+    const res = await fetch(`${API_BASE}/api/compute-profiles`, {
+      method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    ["computeNameInput", "computeKubeconfigInput", "computeNamespaceInput", "computeImageInput",
+     "computeCpuInput", "computeMemoryInput", "computeGpuInput", "computeSlurmHostInput",
+     "computeSlurmPortInput", "computeSlurmUserInput", "computeSlurmKeyInput",
+     "computeSlurmPartitionInput", "computeSlurmWorkdirInput", "computeSlurmTimeInput"
+    ].forEach(id => { $(id).value = ""; });
+    $("newComputeProfileForm").style.display = "none";
+    $("computeCreateStatus").textContent = "";
+    loadComputeProfiles();
+  } catch (e) {
+    $("computeCreateStatus").textContent = "保存失败：" + e.message;
+  }
+});
+
+// Provider 四选一：跟"配置" tab 的 updateProviderUI() 同一个做法——不管选中哪个，
+// 唯一一份共用的 Key/地址输入框（#apiTokenSharedFields）都要搬到被选中那个选项
+// 紧挨着的槽位里，而不是固定显示在四个选项最下面（那样选 Anthropic 时配置项却
+// 贴在 OpenAI 兼容协议下面，看起来完全对不上）。
+const apiTokenSlots = {
+  system_managed: $("apiTokenSystemManagedSlot"),
+  anthropic: $("apiTokenAnthropicSlot"),
+  ollama: $("apiTokenOllamaSlot"),
+  openai_compatible: $("apiTokenOpenAISlot"),
+};
+const apiTokenSharedFields = $("apiTokenSharedFields");
+function updateApiTokenProviderFields() {
+  const provider = document.querySelector('input[name="apiTokenProvider"]:checked').value;
+  const targetSlot = apiTokenSlots[provider];
+  if (targetSlot && apiTokenSharedFields.parentElement !== targetSlot) {
+    targetSlot.appendChild(apiTokenSharedFields);
+  }
+  // API Key 对 system_managed 没有意义（系统自己的账号，用户没有 Key 可填）；
+  // 服务地址只对 ollama/openai_compatible 有意义（Anthropic/系统托管地址固定）
+  $("apiTokenApiKeyField").style.display = (provider === "anthropic" || provider === "ollama" || provider === "openai_compatible") ? "block" : "none";
+  $("apiTokenApiKeyLabel").textContent = provider === "ollama" ? "鉴权 Token（大部分自建服务留空即可）" : "API Key";
+  $("apiTokenBaseUrlField").style.display = (provider === "ollama" || provider === "openai_compatible") ? "block" : "none";
+  // 换了 provider 之后，上一个 provider 探测出来的模型列表就不再有意义了，
+  // 重置成只剩"（默认）"这一项，避免用户误以为这是当前选中 provider 探测出来的结果
+  $("apiTokenProbeStatus").textContent = "";
+  $("apiTokenModelSelect").innerHTML = '<option value="">（默认）</option>';
+  // system_managed 不需要用户填任何字段就能探测，切过去之后自动刷新一次；
+  // 其它三个 provider 的必填字段这时还是空的，自动探测只会立刻报错"请先填 xxx"，
+  // 不如等用户真正填完（下面 blur 事件）或者手动点刷新图标再触发
+  if (provider === "system_managed") refreshApiTokenModels();
+}
+document.querySelectorAll('input[name="apiTokenProvider"]').forEach(r => r.addEventListener("change", updateApiTokenProviderFields));
+
+// 检测可用模型——跟"配置" tab 的 probeModelsBtn 复用同一个后端端点
+// （/api/llm-providers/probe），四个 provider 分别对应它已有的四种探测模式，
+// 不新增后端逻辑，只是这里换一套输入源（apiToken* 系列输入框，不是主配置
+// 那一套）构造请求体。不再是"点按钮才弹出一个额外下拉框"——探测结果直接
+// 写进"选择模型"这一个下拉菜单本身，旁边的刷新图标用来手动重新拉取。
+async function refreshApiTokenModels() {
+  const provider = document.querySelector('input[name="apiTokenProvider"]:checked').value;
+  const select = $("apiTokenModelSelect");
+  const status = $("apiTokenProbeStatus");
+  const previousValue = select.value;   // 刷新之后尽量保留用户已经选的型号（如果新列表里还有）
+
+  let body, headers = { "Content-Type": "application/json" };
+  if (provider === "system_managed") {
+    body = { mode: "system_managed" };
+    headers = { ...headers, ...authHeaders() };   // 系统托管探测要求登录，跟主配置一致
+  } else if (provider === "anthropic") {
+    if (!$("apiTokenApiKeyInput").value.trim()) { status.textContent = "请先填写 API Key"; return; }
+    body = { mode: "commercial_anthropic", api_key: $("apiTokenApiKeyInput").value.trim() };
+  } else if (provider === "ollama") {
+    if (!$("apiTokenBaseUrlInput").value.trim()) { status.textContent = "请先填写服务地址"; return; }
+    body = { mode: "self_hosted", base_url: $("apiTokenBaseUrlInput").value.trim(),
+             api_key: $("apiTokenApiKeyInput").value.trim() || null };
+  } else {
+    if (!$("apiTokenApiKeyInput").value.trim()) { status.textContent = "请先填写 API Key"; return; }
+    body = { mode: "commercial_openai", api_key: $("apiTokenApiKeyInput").value.trim(),
+             base_url: $("apiTokenBaseUrlInput").value.trim() || null };
+  }
+
+  status.textContent = "探测中…";
+  try {
+    const res = await fetch(`${API_BASE}/api/llm-providers/probe`, { method: "POST", headers, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!data.ok) { status.textContent = data.error || "探测失败"; return; }
+    select.innerHTML = '<option value="">（默认）</option>'
+      + data.models.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("");
+    select.value = data.models.includes(previousValue) ? previousValue : (data.models[0] || "");
+    const protocolLabel = data.detected_protocol === "ollama" ? "Ollama" : "OpenAI 兼容";
+    status.textContent = `检测到 ${data.models.length} 个可用模型`
+      + (provider === "ollama" && data.detected_protocol ? `（协议：${protocolLabel}）` : "");
+  } catch (e) {
+    status.textContent = "探测失败：" + e.message;
+  }
+}
+$("apiTokenRefreshModelsBtn").addEventListener("click", refreshApiTokenModels);
+// 填完 Key/地址、光标移开这个输入框时自动刷新一次——不用非得记得去点刷新图标
+$("apiTokenApiKeyInput").addEventListener("blur", () => {
+  if ($("apiTokenApiKeyInput").value.trim()) refreshApiTokenModels();
+});
+$("apiTokenBaseUrlInput").addEventListener("blur", () => {
+  if ($("apiTokenBaseUrlInput").value.trim()) refreshApiTokenModels();
+});
+
+$("newApiTokenBtn").addEventListener("click", () => {
+  $("newApiTokenForm").style.display = $("newApiTokenForm").style.display === "none" ? "block" : "none";
+  $("apiTokenCreateStatus").textContent = "";
+  updateApiTokenProviderFields();
+});
+$("cancelApiTokenBtn").addEventListener("click", () => { $("newApiTokenForm").style.display = "none"; });
+
+$("createApiTokenBtn").addEventListener("click", async () => {
+  const name = $("apiTokenNameInput").value.trim();
+  if (!name) { alert("请填写名称"); return; }
+  const provider = document.querySelector('input[name="apiTokenProvider"]:checked').value;
+  const body = {
+    name, llm_provider: provider,
+    llm_model: $("apiTokenModelSelect").value || null,
+    llm_api_key: $("apiTokenApiKeyField").style.display !== "none" ? ($("apiTokenApiKeyInput").value.trim() || null) : null,
+    llm_base_url: $("apiTokenBaseUrlField").style.display !== "none" ? ($("apiTokenBaseUrlInput").value.trim() || null) : null,
+  };
+  $("apiTokenCreateStatus").textContent = "创建中…";
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/api-tokens`, {
+      method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(apiErrorMessage(data, res));
+    $("apiTokenNameInput").value = "";
+    $("apiTokenApiKeyInput").value = "";
+    $("apiTokenBaseUrlInput").value = "";
+    $("apiTokenModelSelect").innerHTML = '<option value="">（默认）</option>';
+    $("newApiTokenForm").style.display = "none";
+    $("apiTokenCreateStatus").textContent = "";
+    showRawTokenModal(data.raw_token);
+    loadApiTokens();
+  } catch (e) {
+    $("apiTokenCreateStatus").textContent = "创建失败：" + e.message;
+  }
+});
+
+function showRawTokenModal(rawToken) {
+  $("rawTokenDisplay").textContent = rawToken;
+  $("rawTokenCurlExample").textContent =
+    `curl -H "Authorization: Bearer ${rawToken}" -X POST ${API_BASE || location.origin}/api/conversations `
+    + `-H "Content-Type: application/json" -d '{}'`;
+  $("rawTokenModalOverlay").style.display = "flex";
+}
+$("rawTokenModalCloseBtn").addEventListener("click", () => { $("rawTokenModalOverlay").style.display = "none"; });
+$("copyRawTokenBtn").addEventListener("click", () => {
+  navigator.clipboard.writeText($("rawTokenDisplay").textContent).then(() => {
+    $("copyRawTokenBtn").textContent = "已复制";
+    setTimeout(() => { $("copyRawTokenBtn").textContent = "复制"; }, 1500);
+  });
+});
+
+refreshSessionOnLoad().then(handleOAuthRedirectParams);
+
+// ── 预测测试 ─────────────────────────────────────────────────────────
+$("predictBtn").addEventListener("click", async () => {
+  const text = $("predictInput").value.trim();
+  if (!text || !state.taskId) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/tasks/${state.taskId}/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texts: [text] }),
+    });
+    const data = await res.json();
+    const resultEl = $("predictResult");
+    const conf = data.confidences?.[0];
+    const confStr = conf ? Object.entries(conf).sort((a,b)=>b[1]-a[1])[0] : null;
+    resultEl.innerHTML = `<div class="item"><span class="label">${data.predictions[0]}</span><span>${confStr ? (confStr[1]*100).toFixed(1)+"%" : ""}</span></div>` + resultEl.innerHTML;
+  } catch (e) {
+    alert("预测失败：" + e.message);
+  }
+});
+</script>
+</body>
+</html>

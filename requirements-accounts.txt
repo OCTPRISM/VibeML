@@ -1,0 +1,12 @@
+# ── 账号体系 / 配额代理 升级包（可选） ────────────────────────────────────────
+#
+# 安装：pip install -r requirements-accounts.txt
+# 需要一个可访问的 PostgreSQL 实例（本机开发可用 docker 起一个，见 api/settings.py 注释）
+
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+psycopg[binary]>=3.1.0
+pydantic-settings>=2.0.0
+pyjwt>=2.8.0
+argon2-cffi>=23.1.0
+authlib>=1.3.0

@@ -1,0 +1,38 @@
+# ── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ── macOS（本仓库挂在外置卷上，会生成大量 ._* 伴生文件）──
+.DS_Store
+._*
+
+# ── 运行期产物，不入库 ───────────────────────────────────
+# data_cache/ 是用户上传的文件、图片、头像——隐私数据
+# deploy/     是每次训练导出的部署包，含 model.pkl 权重
+# outputs/    是实验输出 + llm_cache.sqlite，含历史 prompt/响应
+# 注意：.gitignore 不支持「模式 + 行尾注释」写在同一行，注释必须独占一行
+data_cache/
+deploy/
+outputs/
+*.pkl
+*.sqlite
+*.sqlite3
+*.db
+
+# ── 密钥与本地配置：绝不入库 ─────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+kubeconfig*
+
+# ── 日志 ────────────────────────────────────────────────
+*.log
+nohup.out

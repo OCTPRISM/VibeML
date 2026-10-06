@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo.svg" alt="VibeML" width="128" height="128">
+  <img src="assets/logo-512.png" alt="VibeML" width="180">
 
   <h1>VibeML</h1>
 

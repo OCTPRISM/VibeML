@@ -1,12 +1,9 @@
-# ── 账号体系 / 配额代理 升级包（可选） ────────────────────────────────────────
+# ⚠ 此文件已废弃，内容已并入 requirements.txt
 #
-# 安装：pip install -r requirements-accounts.txt
-# 需要一个可访问的 PostgreSQL 实例（本机开发可用 docker 起一个，见 api/settings.py 注释）
-
-sqlalchemy>=2.0.0
-alembic>=1.13.0
-psycopg[binary]>=3.1.0
-pydantic-settings>=2.0.0
-pyjwt>=2.8.0
-argon2-cffi>=23.1.0
-authlib>=1.3.0
+# 原因：api/main.py 在模块级就会导入 api/accounts/deps.py，
+# 账号体系的依赖实际上是启动服务的硬依赖，不是可选项。
+# 把它们单列成「可选」曾导致：只装 requirements.txt 的用户
+# 在启动时直接撞上 ModuleNotFoundError: No module named 'sqlalchemy'。
+#
+# 保留此文件只为兼容旧文档里的安装命令，内容与核心重复。
+-r requirements.txt

@@ -1,5 +1,5 @@
 """
-api/main.py  -  Vibe ML Studio API v0.4.0
+api/main.py  -  VibeML API
 
 启动（后端 + 前端一起，同一个地址）：
     cd automl_agent
@@ -13,8 +13,11 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from core.version import __version__
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from api.models import HealthResponse, QueueStatsResponse
@@ -47,7 +50,7 @@ async def lifespan(app: FastAPI):
     task_store.bind_loop(loop)
     conversation_store.bind_loop(loop)
     await job_queue.start()
-    print(f"🚀 Vibe ML Studio API v0.4.0  "
+    print(f"🚀 VibeML API v{__version__}  "
           f"API_KEY={'已设置' if os.environ.get('ANTHROPIC_API_KEY') else '未设置'}")
     if WEB_DIR.exists():
         print(f"   前端界面：http://localhost:8000/  （静态文件目录：{WEB_DIR}）")
@@ -69,7 +72,7 @@ app = FastAPI(
         "- `GET /api/tasks/queue/stats` 队列状态\n\n"
         "**前端界面**：访问根路径 `/` 打开完整的产品界面（web/index.html）。"
     ),
-    version="0.4.0",
+    version=__version__,
     lifespan=lifespan,
 )
 
@@ -116,7 +119,7 @@ async def root():
     index_path = WEB_DIR / "index.html"
     if index_path.exists():
         return FileResponse(index_path, headers=_NO_CACHE_HEADERS)
-    return JSONResponse({"name": "Vibe ML Studio API", "version": "0.4.0", "docs": "/docs",
+    return JSONResponse({"name": "VibeML API", "version": __version__, "docs": "/docs",
                           "note": f"前端文件未找到（期望路径：{index_path}）"})
 
 @app.get("/app.js", include_in_schema=False)

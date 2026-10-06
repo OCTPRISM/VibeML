@@ -1,0 +1,25 @@
+# ── VibeML 重型后端（可选）──────────────────────────────────────────────────
+#
+#   pip install -r requirements.txt -r requirements-nn.txt
+#
+# 不装这一份，系统仍可完整运行 sklearn 路径；只是以下后端不可用：
+#   pretrained_nn / custom_nn   预训练模型微调、LLM 生成分类头
+#   llm_finetune                任意 HF causal LM + LoRA 指令微调
+#   rl                          LLM 生成 Gym 环境 + 强化学习
+#   vlm_image_cls / vlm_gen     图像分类、看图说话 / 视觉问答
+#
+# ⚠ 体积约 3GB（torch 占大头）。Apple Silicon 走 MPS，NVIDIA 走 CUDA，
+#   都没有时自动退回 CPU。
+
+torch>=2.1.0,<3.0.0
+transformers>=4.40.0,<6.0.0
+peft>=0.10.0,<1.0.0                    # LoRA 微调
+sentence-transformers>=2.7.0,<6.0.0    # 难例检索的句向量
+psutil>=5.9.0,<8.0.0                   # 底座模型体积预检（避免 OOM）
+
+# 强化学习
+gymnasium>=0.29.0,<2.0.0
+stable-baselines3>=2.2.0,<3.0.0
+
+# 生成式评估指标（BLEU / ROUGE-L）
+rouge-score>=0.1.2,<0.2.0

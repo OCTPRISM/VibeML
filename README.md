@@ -124,8 +124,11 @@
 ## 快速开始
 
 ```bash
-# 1. 装依赖
+# 1. 装依赖（核心约 200MB，够跑完整对话流程 + sklearn 后端）
 pip install -r requirements.txt
+
+#    需要神经网络 / 强化学习 / 视觉后端时再装（约 3GB）
+#    pip install -r requirements-nn.txt
 
 # 2. 用本地模型跑（免费，推荐）—— 先装好 Ollama 并拉一个模型
 ollama pull qwen3:30b
@@ -243,7 +246,7 @@ n=20, p=0.7  →  σ = ±10.2%   # 70% 与 75% 不可区分
 - **账号体系**：注册登录 / Google OAuth / JWT / 按次计量的 LLM 用量审计
 - **API 服务**：长效 API Token，每个 Token 自带独立 provider 配置，API 发起的会话可在网页只读查看
 - **附件**：PDF / Word / Excel / Markdown / 图片 / 压缩包，支持拖拽与粘贴长文本转附件
-- **计算资源**：可配置 Slurm / Kubernetes 连接（⚠ 见下方限制）
+- **计算资源**：可配置并测试 Slurm / Kubernetes 连接（⚠ 仅到此为止，训练仍在本地执行，见「已知限制」）
 - **产物导出**：模型包与代码包一键打包下载
 
 ---

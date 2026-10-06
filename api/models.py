@@ -1,4 +1,5 @@
 from __future__ import annotations
+from core.version import __version__
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 from enum import Enum
@@ -72,7 +73,7 @@ class QueueStatsResponse(BaseModel):
     queued: int; running: int; completed: int; failed: int; max_concurrent: int
 
 class HealthResponse(BaseModel):
-    status: str = "ok"; version: str = "0.4.0"; phase: str = "Phase 4"
+    status: str = "ok"; version: str = __version__; phase: str = "stable"
 
 # ── 数据源接入 ─────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 [tool.briefcase]
 project_name = "Vibe ML Studio"
 bundle = "com.vibemlstudio"
-version = "0.4.0"
+version = "0.1.0"
 license.file = "LICENSE"
 url = "https://vibemlstudio.example"
 author = "Vibe ML Studio"

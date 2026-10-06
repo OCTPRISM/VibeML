@@ -297,5 +297,45 @@ test("reduceEvent 不修改传入的原 state（不可变性，防止渲染时�
 
 // ── 汇总 ──────────────────────────────────────────────────────────────────
 
+
+test("iteration_done 存下用于决策的 robustMetric，与 epoch 级 val_metric 区分开", () => {
+  // 回归用：界面曾经显示 epoch 级单次切分值，而对话播报显示交叉验证均值，
+  // 同一屏出现两个互相矛盾的数字。这里锁死"决策指标"必须被单独存下来。
+  let s = initialState();
+  s = reduceEvent(s, { type: "iteration_start", iteration: 1 });
+  s = reduceEvent(s, { type: "epoch_done", iteration: 1, epoch: 1, val_metric: 0.769,
+                       train_loss: 0.4, val_loss: 0.5 });
+  // 此时还没评估完，robustMetric 尚未产生
+  assert.equal(s.robustMetric, null);
+
+  s = reduceEvent(s, {
+    type: "iteration_done", iteration: 1,
+    val_metric: 0.769,                                   // 单次切分（乐观）
+    robust_metric: 0.731,                                // 交叉验证均值（决策用）
+    metric_summary: "73.1% ±12.8%（5 折交叉验证）",
+    eval_method: "cv", significant: false,
+    diagnosis: "d", root_cause: "r", recommendation: "rec",
+    next_action: "stop_plateau", confidence: 0.6,
+  });
+  assert.equal(s.robustMetric, 0.731);                   // 决策口径
+  assert.equal(s.metricSummary, "73.1% ±12.8%（5 折交叉验证）");
+  assert.equal(s.evalMethod, "cv");
+  assert.equal(s.significant, false);
+  assert.equal(s.lastIteration, 1);
+  // epoch 级数据保持原样，不被污染
+  assert.equal(s.epochHistory[0].valMetric, 0.769);
+  // bestMetric 语义不变（epoch 级最大值），避免破坏既有契约
+  assert.equal(s.bestMetric, 0.769);
+});
+
+test("iteration_done 缺少 robust_metric 时回退到 val_metric（兼容旧事件）", () => {
+  let s = initialState();
+  s = reduceEvent(s, { type: "iteration_start", iteration: 1 });
+  s = reduceEvent(s, { type: "iteration_done", iteration: 1, val_metric: 0.8,
+                       diagnosis: "d", root_cause: "r", recommendation: "rec",
+                       next_action: "continue_training", confidence: 0.5 });
+  assert.equal(s.robustMetric, 0.8);
+});
+
 console.log(`\n${passed}/${passed + failed} tests passed`);
 if (failed > 0) process.exit(1);

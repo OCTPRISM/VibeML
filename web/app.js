@@ -32,6 +32,11 @@ export function initialState() {
     currentIterationIdx: -1,
     epochHistory:  [],           // 展平的 { iteration, epoch, val_metric, train_loss, val_loss, per_class, confusion }
     bestMetric:    0,
+    robustMetric:  null,   // 用于决策的指标（CV 均值或单次切分），与播报同口径
+    metricSummary: null,   // 形如 "73.1% ±12.8%（5 折交叉验证）"
+    evalMethod:    null,   // "cv" | "holdout"
+    significant:   null,   // 本轮改动是否超过噪声下界
+    lastIteration: null,
     flywheel:      null,         // 最近一次 flywheel_done
     deploy:        null,         // deploy_done payload
     feedbackBaseline: null,
@@ -185,7 +190,21 @@ export function reduceEvent(state, event) {
         confidence:     event.confidence,
       };
       const iterations = _updateCurrentIteration(s, (it) => ({ ...it, explanation }));
-      return { ...s, iterations };
+      // 新增：把**用于决策的那个指标**单独存下来。
+      // 后端用 robust_metric（有交叉验证时是 CV 均值）判断"这一轮算不算真提升"，
+      // 训练完成播报里的"最佳 accuracy"也是这个口径；而 epochHistory 里存的
+      // 是单次切分的 epoch 级 val_metric。两者本来就不是一个东西，
+      // 界面上必须显示前者，否则同一屏会出现两个互相矛盾的数字。
+      // bestMetric 的语义保持不变（epoch 级最大值），避免破坏既有契约。
+      return {
+        ...s,
+        iterations,
+        robustMetric:    event.robust_metric ?? event.val_metric,
+        metricSummary:   event.metric_summary || null,
+        evalMethod:      event.eval_method || null,
+        significant:     event.significant ?? null,
+        lastIteration:   event.iteration ?? s.lastIteration,
+      };
     }
 
     case "hyperparams_adjusted": {

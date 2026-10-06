@@ -2847,10 +2847,22 @@ function appendLog(event) {
 // ── 渲染 ─────────────────────────────────────────────────────────────
 function render(s) {
   // 指标卡片
-  if (s.epochHistory.length) {
+  // 指标卡显示**用于决策的那个指标**，与训练完成播报里的"最佳 accuracy" 同口径。
+  // 以前这里显示的是单次切分的 epoch 级 val_metric，而播报用的是交叉验证均值，
+  // 结果同一屏上出现两个不一样的数字（实测 76.9% vs 73.1%）——对一个主打
+  // "指标可信"的产品，这是硬伤。现在统一到 robustMetric，并把不确定度一并显示出来。
+  if (s.robustMetric != null) {
+    $("curMetric").textContent = (s.robustMetric * 100).toFixed(1) + "%";
+    const parts = [];
+    if (s.lastIteration) parts.push(`迭代 ${s.lastIteration}`);
+    parts.push(s.metricSummary || "单次切分估计");
+    if (s.significant === false) parts.push("本轮无提升");
+    $("curMetricSub").textContent = parts.join(" · ");
+  } else if (s.epochHistory.length) {
+    // 第一轮还没评估完时，先显示 epoch 级的粗略值并明确标注，不冒充最终结论
     const last = s.epochHistory[s.epochHistory.length - 1];
     $("curMetric").textContent = (last.valMetric * 100).toFixed(1) + "%";
-    $("curMetricSub").textContent = `迭代 ${last.iteration} · Epoch ${last.epoch} · 最佳 ${(s.bestMetric*100).toFixed(1)}%`;
+    $("curMetricSub").textContent = `迭代 ${last.iteration} · Epoch ${last.epoch} · 本轮评估中…`;
   }
   if (s.dataReport) {
     $("dataCount").textContent = s.dataReport.totalSamples;

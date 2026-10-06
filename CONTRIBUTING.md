@@ -17,7 +17,7 @@ LLM 建议用本地 Ollama，开发期间不产生任何 API 费用。
 ## 提交前请跑
 
 ```bash
-node web/test_app_logic.mjs       # 前端状态归约，应为 28/28
+node web/test_app_logic.mjs       # 前端状态归约，应为 30/30
 python -m py_compile $(git ls-files '*.py')
 ```
 

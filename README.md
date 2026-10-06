@@ -272,7 +272,7 @@ core/*_trainer.py         七种后端，统一经 subprocess_runner 隔离
 core/*_deployer.py        导出独立可运行的部署包（权重 + inference.py + README）
 ```
 
-前端 `web/index.html` 通过 WebSocket 实时接收训练事件，`web/app.js::reduceEvent` 负责状态归约（28 个单元测试覆盖）。
+前端 `web/index.html` 通过 WebSocket 实时接收训练事件，`web/app.js::reduceEvent` 负责状态归约（30 个单元测试覆盖）。
 
 ---
 

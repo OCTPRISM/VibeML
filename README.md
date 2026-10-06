@@ -444,4 +444,4 @@ GET /api/tasks/{task_id}/export/code    代码包：inference.py + 生成的架�
 
 ## 许可
 
-本项目尚未声明开源许可证。在作者补充 LICENSE 文件之前，默认保留所有权利。
+本项目采用 [MIT License](LICENSE) 开源。

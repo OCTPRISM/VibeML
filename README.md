@@ -278,35 +278,13 @@ core/*_deployer.py        导出独立可运行的部署包（权重 + inference
 
 对话推进由一个 Agent 主循环驱动，它**不重新实现任何训练逻辑**——只是通过工具调用去驱动下面那条完全不变的确定性流水线。
 
-```
-                  ┌──────────────────────────────────────────┐
-  用户消息 ──────▶ │  AgentOrchestrator  (core/agent/)         │
-                  │  主循环：≤15 轮 / ≤300s，超限友好收尾      │
-                  └───────────┬──────────────────────────────┘
-                              │ complete_with_tools()
-                  ┌───────────▼──────────────────────────────┐
-                  │  provider 无关的工具调用抽象               │
-                  │  AgentMessage / ToolDef / ToolCall /      │
-                  │  ToolResult / CompletionResult            │
-                  │  ┌────────┬────────┬──────────────────┐  │
-                  │  │Anthropic│ Ollama │ OpenAI 兼容      │  │
-                  │  └────────┴────────┴──────────────────┘  │
-                  └───────────┬──────────────────────────────┘
-                              │ 每次调用都过配额网关计量
-                  ┌───────────▼──────────────────────────────┐
-                  │  11 个工具 (core/agent/tools.py)          │
-                  │  计划  set_plan / update_step_status      │
-                  │  数据  search_datasets / preview_dataset  │
-                  │        request_dataset_confirmation       │
-                  │  建模  design_architecture/select_backbone│
-                  │  训练  submit_training                    │
-                  │        check_training_progress            │
-                  │  协作  spawn_subagent                     │
-                  │  收尾  finish_run                         │
-                  └───────────┬──────────────────────────────┘
-                              ▼
-                   既有确定性流水线（一字未改）
-```
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)"  srcset="assets/arch-multiagent-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/arch-multiagent-light.svg">
+    <img src="assets/arch-multiagent-dark.svg" alt="VibeML Multi-Agent 技术框架" width="100%">
+  </picture>
+</div>
 
 #### 五个关键设计
 

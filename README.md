@@ -15,6 +15,8 @@
 <img alt="CN" src="https://img.shields.io/badge/中文-优先-dc2626">
 </p>
 
+<p><b>简体中文</b> · <a href="README.en.md">English</a></p>
+
 </div>
 
 ---
@@ -280,9 +282,9 @@ core/*_deployer.py        导出独立可运行的部署包（权重 + inference
 
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)"  srcset="assets/arch-multiagent-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="assets/arch-multiagent-light.svg">
-    <img src="assets/arch-multiagent-dark.svg" alt="VibeML Multi-Agent 技术框架" width="100%">
+    <source media="(prefers-color-scheme: dark)"  srcset="assets/arch-multiagent-zh-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/arch-multiagent-zh-light.svg">
+    <img src="assets/arch-multiagent-zh-dark.svg" alt="VibeML Multi-Agent 技术框架" width="100%">
   </picture>
 </div>
 

@@ -274,6 +274,72 @@ core/*_deployer.py        导出独立可运行的部署包（权重 + inference
 
 前端 `web/index.html` 通过 WebSocket 实时接收训练事件，`web/app.js::reduceEvent` 负责状态归约（30 个单元测试覆盖）。
 
+### Multi-Agent 层
+
+对话推进由一个 Agent 主循环驱动，它**不重新实现任何训练逻辑**——只是通过工具调用去驱动下面那条完全不变的确定性流水线。
+
+```
+                  ┌──────────────────────────────────────────┐
+  用户消息 ──────▶ │  AgentOrchestrator  (core/agent/)         │
+                  │  主循环：≤15 轮 / ≤300s，超限友好收尾      │
+                  └───────────┬──────────────────────────────┘
+                              │ complete_with_tools()
+                  ┌───────────▼──────────────────────────────┐
+                  │  provider 无关的工具调用抽象               │
+                  │  AgentMessage / ToolDef / ToolCall /      │
+                  │  ToolResult / CompletionResult            │
+                  │  ┌────────┬────────┬──────────────────┐  │
+                  │  │Anthropic│ Ollama │ OpenAI 兼容      │  │
+                  │  └────────┴────────┴──────────────────┘  │
+                  └───────────┬──────────────────────────────┘
+                              │ 每次调用都过配额网关计量
+                  ┌───────────▼──────────────────────────────┐
+                  │  11 个工具 (core/agent/tools.py)          │
+                  │  计划  set_plan / update_step_status      │
+                  │  数据  search_datasets / preview_dataset  │
+                  │        request_dataset_confirmation       │
+                  │  建模  design_architecture/select_backbone│
+                  │  训练  submit_training                    │
+                  │        check_training_progress            │
+                  │  协作  spawn_subagent                     │
+                  │  收尾  finish_run                         │
+                  └───────────┬──────────────────────────────┘
+                              ▼
+                   既有确定性流水线（一字未改）
+```
+
+#### 五个关键设计
+
+**1. provider 无关，不绑定任何一家**
+Agent 循环只操作自己定义的 `AgentMessage`，从不知道 Anthropic 的 `tool_use` block 或 OpenAI 的 `tool_calls` 长什么样。每个 provider 自行负责双向翻译。三家实现各自的 `complete_with_tools()`，所以**本地 Ollama 也能跑完整的 Agent 流程**，不是 Anthropic 专属能力。
+
+**2. Agent 不判定成败，只调用和读取**
+`submit_training` 调的就是网页端同一个 `api/worker.py::submit_training_job`；`check_training_progress` 只读 `task_store` 里真实测出来的字段。**绝不让 LLM 自己认定「这样就算成功了」**——沙盒校验、子进程超时、噪声门禁全部在 Agent 够不到的地方执行，它没有任何路径能绕开。
+
+**3. 终止-恢复，而不是阻塞等待**
+需要用户确认时（比如真实下载外部数据集前），Agent 把确认卡片发出去、把 `agent_pending_action` 和 `agent_transcript` 存进会话状态，然后**结束本次调用**。下一条消息进来时从 transcript 恢复工具调用历史继续跑。这样跨进程部署也成立，不会泄漏挂起的协程。
+
+**4. 短生命周期子 Agent，工具集受限**
+需要并行调研时派生子 Agent（`MAX_CONCURRENT_SUBAGENTS=3`，每个 `≤8` 轮）。子 Agent **只拿到只读工具**（`search_datasets` / `preview_dataset`），明确不含 `submit_training` 这类有副作用的工具，结论作为一条 `tool_result` 回灌主 Agent。
+
+**5. 工具调用不可用时自动降级**
+本地小模型的 function calling 稳定性参差不齐。一轮下来零工具调用时，自动退回确定性状态机继续把任务做完，并在界面上**如实告知**已切换，而不是假装在思考。降级是粘性的——既然已确认该模型发不出工具调用，不必每条消息再花十几次调用重新发现。
+
+#### 可观测性
+
+每一步都向前端推送 `agent_event`，共 10 种事件：`plan_created`、`plan_step_update`、`tool_result`、`subagent_spawned`、`subagent_done`、`resource_usage`、`confirmation_required`、`training_snapshot`、`fallback_to_workflow`、`final`。
+
+其中 `resource_usage` 带 `turn` / `duration_ms` / `prompt_tokens` / `completion_tokens` / `total_tokens`，前端顶部的资源条实时显示**每个 agent 在做什么、花了多久、烧了多少 token**。
+
+#### 可扩展接入
+
+- **MCP**：`core/agent/mcp_client.py` 用官方 SDK 的 streamable-HTTP 客户端接入任意 MCP 服务器，其工具与内置工具平权。每个连接独占一个 asyncio Task（SDK 的 `ClientSession` 用 anyio TaskGroup 管理读写协程，跨 Task 调用会出问题）；单个服务器连不上只跳过它，不拖垮整个 Agent。
+- **Skill**：`core/agent/skills.py` 的内置 Skill 以文本形式追加进系统提示，用户在设置里按需启用。
+
+#### 成本
+
+Multi-Agent 模式下单条用户消息可能触发多达 15 次 LLM 调用（确定性流程通常 1 次）。这是「更自主」必然的代价——所以**配额网关挂在 `complete_with_tools()` 上而不只是 `complete()`**，否则系统托管用户可以不计量地跑十几轮工具调用循环。用本地 Ollama 则不产生任何费用。
+
 ---
 
 ## 已知限制（如实记录）
